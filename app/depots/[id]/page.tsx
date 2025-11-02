@@ -22,6 +22,17 @@ export default function BankDetailPage() {
     currency: 'EUR' as 'EUR' | 'USD',
     notes: '',
   });
+  const [editingPositionId, setEditingPositionId] = useState<number | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    isin: '',
+    ticker: '',
+    assetType: 'stock' as 'stock' | 'etf' | 'bond',
+    purchaseDate: '',
+    quantity: '',
+    purchasePrice: '',
+    currency: 'EUR' as 'EUR' | 'USD',
+    notes: '',
+  });
 
   // Live queries
   const bank = useLiveQuery(() => db.banks.get(bankId));
@@ -86,6 +97,84 @@ export default function BankDetailPage() {
       console.error('Failed to delete position:', error);
       alert('Fehler beim Löschen der Position');
     }
+  };
+
+  const handleEditPosition = (position: Position) => {
+    setEditingPositionId(position.id!);
+    const purchaseDateStr = position.purchaseDate instanceof Date
+      ? position.purchaseDate.toISOString().split('T')[0]
+      : new Date(position.purchaseDate).toISOString().split('T')[0];
+
+    setEditFormData({
+      isin: position.isin,
+      ticker: position.ticker,
+      assetType: position.assetType,
+      purchaseDate: purchaseDateStr,
+      quantity: position.quantity.toString(),
+      purchasePrice: position.purchasePrice.toString(),
+      currency: position.currency,
+      notes: position.notes || '',
+    });
+  };
+
+  const handleEditInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdatePosition = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editFormData.isin || !editFormData.ticker || !editFormData.purchaseDate ||
+        !editFormData.quantity || !editFormData.purchasePrice || !editingPositionId) {
+      alert('Bitte fülle alle Pflichtfelder aus');
+      return;
+    }
+
+    try {
+      await db.positions.update(editingPositionId, {
+        isin: editFormData.isin.trim().toUpperCase(),
+        ticker: editFormData.ticker.trim().toUpperCase(),
+        assetType: editFormData.assetType,
+        purchaseDate: new Date(editFormData.purchaseDate),
+        quantity: parseFloat(editFormData.quantity),
+        purchasePrice: parseFloat(editFormData.purchasePrice),
+        currency: editFormData.currency,
+        notes: editFormData.notes.trim() || undefined,
+      });
+
+      // Reset edit state
+      setEditingPositionId(null);
+      setEditFormData({
+        isin: '',
+        ticker: '',
+        assetType: 'stock',
+        purchaseDate: '',
+        quantity: '',
+        purchasePrice: '',
+        currency: 'EUR',
+        notes: '',
+      });
+    } catch (error) {
+      console.error('Failed to update position:', error);
+      alert('Fehler beim Aktualisieren der Position');
+    }
+  };
+
+  const handleCancelEditPosition = () => {
+    setEditingPositionId(null);
+    setEditFormData({
+      isin: '',
+      ticker: '',
+      assetType: 'stock',
+      purchaseDate: '',
+      quantity: '',
+      purchasePrice: '',
+      currency: 'EUR',
+      notes: '',
+    });
   };
 
   const formatCurrency = (amount: number, currency: string) => {
@@ -325,63 +414,212 @@ export default function BankDetailPage() {
             ) : (
               positions.map((position) => {
                 const totalValue = position.quantity * position.purchasePrice;
+                const isEditing = editingPositionId === position.id;
+
                 return (
                   <div
                     key={position.id}
                     className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
                   >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                            {position.ticker}
-                          </h3>
-                          <span className="px-2 py-1 text-xs font-medium bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded">
-                            {position.assetType === 'stock' ? 'Aktie' : position.assetType === 'etf' ? 'ETF' : 'Anleihe'}
-                          </span>
+                    {isEditing ? (
+                      // Edit Form
+                      <form onSubmit={handleUpdatePosition}>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+                          Position bearbeiten
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              ISIN *
+                            </label>
+                            <input
+                              type="text"
+                              name="isin"
+                              value={editFormData.isin}
+                              onChange={handleEditInputChange}
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Ticker *
+                            </label>
+                            <input
+                              type="text"
+                              name="ticker"
+                              value={editFormData.ticker}
+                              onChange={handleEditInputChange}
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Asset-Typ *
+                            </label>
+                            <select
+                              name="assetType"
+                              value={editFormData.assetType}
+                              onChange={handleEditInputChange}
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            >
+                              <option value="stock">Aktie</option>
+                              <option value="etf">ETF</option>
+                              <option value="bond">Anleihe</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Kaufdatum *
+                            </label>
+                            <input
+                              type="date"
+                              name="purchaseDate"
+                              value={editFormData.purchaseDate}
+                              onChange={handleEditInputChange}
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Anzahl *
+                            </label>
+                            <input
+                              type="number"
+                              name="quantity"
+                              value={editFormData.quantity}
+                              onChange={handleEditInputChange}
+                              step="0.001"
+                              min="0"
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Kaufpreis (pro Stück) *
+                            </label>
+                            <input
+                              type="number"
+                              name="purchasePrice"
+                              value={editFormData.purchasePrice}
+                              onChange={handleEditInputChange}
+                              step="0.01"
+                              min="0"
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Währung *
+                            </label>
+                            <select
+                              name="currency"
+                              value={editFormData.currency}
+                              onChange={handleEditInputChange}
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            >
+                              <option value="EUR">EUR</option>
+                              <option value="USD">USD</option>
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Notizen (optional)
+                            </label>
+                            <textarea
+                              name="notes"
+                              value={editFormData.notes}
+                              onChange={handleEditInputChange}
+                              rows={2}
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
                         </div>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-                          ISIN: {position.isin}
-                        </p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-zinc-500 dark:text-zinc-500">Anzahl</p>
-                            <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                              {position.quantity}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500 dark:text-zinc-500">Kaufpreis</p>
-                            <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                              {formatCurrency(position.purchasePrice, position.currency)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500 dark:text-zinc-500">Gesamtwert</p>
-                            <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                              {formatCurrency(totalValue, position.currency)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500 dark:text-zinc-500">Kaufdatum</p>
-                            <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                              {formatDate(position.purchaseDate)}
-                            </p>
-                          </div>
+                        <div className="flex gap-3 mt-4">
+                          <button
+                            type="submit"
+                            className="px-6 py-2 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
+                          >
+                            Speichern
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditPosition}
+                            className="px-6 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                          >
+                            Abbrechen
+                          </button>
                         </div>
-                        {position.notes && (
-                          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-3">
-                            {position.notes}
+                      </form>
+                    ) : (
+                      // Normal View
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                              {position.ticker}
+                            </h3>
+                            <span className="px-2 py-1 text-xs font-medium bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded">
+                              {position.assetType === 'stock' ? 'Aktie' : position.assetType === 'etf' ? 'ETF' : 'Anleihe'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
+                            ISIN: {position.isin}
                           </p>
-                        )}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-zinc-500 dark:text-zinc-500">Anzahl</p>
+                              <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                {position.quantity}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-zinc-500 dark:text-zinc-500">Kaufpreis</p>
+                              <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                {formatCurrency(position.purchasePrice, position.currency)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-zinc-500 dark:text-zinc-500">Gesamtwert</p>
+                              <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                {formatCurrency(totalValue, position.currency)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-zinc-500 dark:text-zinc-500">Kaufdatum</p>
+                              <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                {formatDate(position.purchaseDate)}
+                              </p>
+                            </div>
+                          </div>
+                          {position.notes && (
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-3">
+                              {position.notes}
+                            </p>
+                          )}
+                        </div>
+                        <div className="ml-4 flex gap-2">
+                          <button
+                            onClick={() => handleEditPosition(position)}
+                            className="px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                          >
+                            Bearbeiten
+                          </button>
+                          <button
+                            onClick={() => position.id && handleDeletePosition(position.id)}
+                            className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          >
+                            Löschen
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => position.id && handleDeletePosition(position.id)}
-                        className="ml-4 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      >
-                        Löschen
-                      </button>
-                    </div>
+                    )}
                   </div>
                 );
               })
