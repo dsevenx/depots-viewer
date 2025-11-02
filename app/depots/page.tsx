@@ -9,6 +9,9 @@ export default function DepotsPage() {
   const [isAddingBank, setIsAddingBank] = useState(false);
   const [bankName, setBankName] = useState('');
   const [bankNotes, setBankNotes] = useState('');
+  const [editingBankId, setEditingBankId] = useState<number | null>(null);
+  const [editBankName, setEditBankName] = useState('');
+  const [editBankNotes, setEditBankNotes] = useState('');
 
   // Live query - updates automatically when data changes
   const banks = useLiveQuery(() => db.banks.toArray());
@@ -50,6 +53,39 @@ export default function DepotsPage() {
       console.error('Failed to delete bank:', error);
       alert('Fehler beim Löschen der Bank');
     }
+  };
+
+  const handleEditBank = (bank: Bank) => {
+    setEditingBankId(bank.id!);
+    setEditBankName(bank.name);
+    setEditBankNotes(bank.notes || '');
+  };
+
+  const handleUpdateBank = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editBankName.trim() || !editingBankId) return;
+
+    try {
+      await db.banks.update(editingBankId, {
+        name: editBankName.trim(),
+        notes: editBankNotes.trim() || undefined,
+      });
+
+      // Reset edit state
+      setEditingBankId(null);
+      setEditBankName('');
+      setEditBankNotes('');
+    } catch (error) {
+      console.error('Failed to update bank:', error);
+      alert('Fehler beim Aktualisieren der Bank');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBankId(null);
+    setEditBankName('');
+    setEditBankNotes('');
   };
 
   return (
@@ -146,38 +182,100 @@ export default function DepotsPage() {
             ) : (
               banks.map((bank) => {
                 const positionCount = bank.id ? getPositionCount(bank.id) : 0;
+                const isEditing = editingBankId === bank.id;
+
                 return (
                   <div
                     key={bank.id}
                     className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
                   >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-1">
-                          {bank.name}
+                    {isEditing ? (
+                      // Edit Form
+                      <form onSubmit={handleUpdateBank}>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+                          Bank bearbeiten
                         </h3>
-                        {bank.notes && (
-                          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                            {bank.notes}
+                        <div className="space-y-4">
+                          <div>
+                            <label htmlFor="editBankName" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Bank/Broker Name *
+                            </label>
+                            <input
+                              type="text"
+                              id="editBankName"
+                              value={editBankName}
+                              onChange={(e) => setEditBankName(e.target.value)}
+                              required
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label htmlFor="editBankNotes" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              Notizen (optional)
+                            </label>
+                            <textarea
+                              id="editBankNotes"
+                              value={editBankNotes}
+                              onChange={(e) => setEditBankNotes(e.target.value)}
+                              rows={2}
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              type="submit"
+                              className="px-6 py-2 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
+                            >
+                              Speichern
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="px-6 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                            >
+                              Abbrechen
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
+                      // Normal View
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-1">
+                            {bank.name}
+                          </h3>
+                          {bank.notes && (
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                              {bank.notes}
+                            </p>
+                          )}
+                          <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">
+                            Erstellt: {new Date(bank.createdAt).toLocaleDateString('de-DE')} • {positionCount} Position{positionCount !== 1 ? 'en' : ''}
                           </p>
-                        )}
-                        <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">
-                          Erstellt: {new Date(bank.createdAt).toLocaleDateString('de-DE')} • {positionCount} Position{positionCount !== 1 ? 'en' : ''}
-                        </p>
-                        <Link
-                          href={`/depots/${bank.id}`}
-                          className="inline-block px-4 py-2 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
-                        >
-                          Positionen verwalten →
-                        </Link>
+                          <Link
+                            href={`/depots/${bank.id}`}
+                            className="inline-block px-4 py-2 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+                          >
+                            Positionen verwalten →
+                          </Link>
+                        </div>
+                        <div className="ml-4 flex gap-2">
+                          <button
+                            onClick={() => handleEditBank(bank)}
+                            className="px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                          >
+                            Bearbeiten
+                          </button>
+                          <button
+                            onClick={() => bank.id && handleDeleteBank(bank.id)}
+                            className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          >
+                            Löschen
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => bank.id && handleDeleteBank(bank.id)}
-                        className="ml-4 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      >
-                        Löschen
-                      </button>
-                    </div>
+                    )}
                   </div>
                 );
               })
