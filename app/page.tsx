@@ -53,6 +53,29 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-16">
+        <div className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                © 2025 Depots Viewer. Built with Next.js & Tailwind CSS.
+              </p>
+              <div className="flex gap-6 text-sm">
+                <a href="#" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
+                  Privacy
+                </a>
+                <a href="#" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
+                  Terms
+                </a>
+                <a href="#" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors">
+                  Contact
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
