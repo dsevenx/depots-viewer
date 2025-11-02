@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
@@ -43,12 +45,20 @@ export default function Home() {
 
           <div className="mt-12 text-center">
             <div className="inline-flex flex-col sm:flex-row gap-4">
-              <button className="px-8 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors">
-                Get Started
-              </button>
-              <button className="px-8 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors">
-                Learn More
-              </button>
+              <Link
+                href="/depots"
+                className="px-8 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
+              >
+                Zu meinen Depots
+              </Link>
+              <a
+                href="https://github.com/dsevenx/depots-viewer"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-8 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+              >
+                GitHub
+              </a>
             </div>
           </div>
         </div>
