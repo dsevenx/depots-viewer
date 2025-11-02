@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import Link from 'next/link';
 import { db, Bank } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 
@@ -11,6 +12,12 @@ export default function DepotsPage() {
 
   // Live query - updates automatically when data changes
   const banks = useLiveQuery(() => db.banks.toArray());
+  const positions = useLiveQuery(() => db.positions.toArray());
+
+  // Count positions per bank
+  const getPositionCount = (bankId: number) => {
+    return positions?.filter((p) => p.bankId === bankId).length || 0;
+  };
 
   const handleAddBank = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,34 +144,43 @@ export default function DepotsPage() {
                 </p>
               </div>
             ) : (
-              banks.map((bank) => (
-                <div
-                  key={bank.id}
-                  className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-1">
-                        {bank.name}
-                      </h3>
-                      {bank.notes && (
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                          {bank.notes}
+              banks.map((bank) => {
+                const positionCount = bank.id ? getPositionCount(bank.id) : 0;
+                return (
+                  <div
+                    key={bank.id}
+                    className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-1">
+                          {bank.name}
+                        </h3>
+                        {bank.notes && (
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                            {bank.notes}
+                          </p>
+                        )}
+                        <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">
+                          Erstellt: {new Date(bank.createdAt).toLocaleDateString('de-DE')} • {positionCount} Position{positionCount !== 1 ? 'en' : ''}
                         </p>
-                      )}
-                      <p className="text-xs text-zinc-500 dark:text-zinc-500">
-                        Erstellt: {new Date(bank.createdAt).toLocaleDateString('de-DE')}
-                      </p>
+                        <Link
+                          href={`/depots/${bank.id}`}
+                          className="inline-block px-4 py-2 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+                        >
+                          Positionen verwalten →
+                        </Link>
+                      </div>
+                      <button
+                        onClick={() => bank.id && handleDeleteBank(bank.id)}
+                        className="ml-4 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      >
+                        Löschen
+                      </button>
                     </div>
-                    <button
-                      onClick={() => bank.id && handleDeleteBank(bank.id)}
-                      className="ml-4 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                    >
-                      Löschen
-                    </button>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
