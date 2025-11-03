@@ -11,6 +11,36 @@ export interface ParseResult<T> {
 }
 
 /**
+ * Detects the delimiter used in a CSV file (comma or semicolon)
+ */
+function detectDelimiter(csvString: string): ',' | ';' {
+  const firstLine = csvString.split('\n')[0];
+  if (!firstLine) return ',';
+
+  let commaCount = 0;
+  let semicolonCount = 0;
+  let insideQuotes = false;
+
+  for (let i = 0; i < firstLine.length; i++) {
+    const char = firstLine[i];
+
+    if (char === '"') {
+      if (insideQuotes && firstLine[i + 1] === '"') {
+        i++; // Skip escaped quote
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (!insideQuotes) {
+      if (char === ',') commaCount++;
+      else if (char === ';') semicolonCount++;
+    }
+  }
+
+  // Use semicolon if there are more semicolons than commas
+  return semicolonCount > commaCount ? ';' : ',';
+}
+
+/**
  * Converts an array of objects to CSV string
  */
 export function arrayToCSV<T extends Record<string, any>>(
@@ -42,9 +72,9 @@ export function arrayToCSV<T extends Record<string, any>>(
 }
 
 /**
- * Parses CSV header row
+ * Parses CSV header row with specified delimiter
  */
-function parseCSVHeader(line: string): string[] {
+function parseCSVHeader(line: string, delimiter: ',' | ';'): string[] {
   const headers: string[] = [];
   let currentValue = '';
   let insideQuotes = false;
@@ -59,7 +89,7 @@ function parseCSVHeader(line: string): string[] {
       } else {
         insideQuotes = !insideQuotes;
       }
-    } else if (char === ',' && !insideQuotes) {
+    } else if (char === delimiter && !insideQuotes) {
       headers.push(currentValue.trim());
       currentValue = '';
     } else {
@@ -72,13 +102,17 @@ function parseCSVHeader(line: string): string[] {
 
 /**
  * Parses CSV string to array of objects
+ * Automatically detects delimiter (comma or semicolon)
  */
 export function csvToArray(csvString: string): Record<string, string>[] {
   const lines = csvString.trim().split('\n');
   if (lines.length <= 1) return []; // Need at least header + 1 data row
 
-  // Parse header row properly
-  const headers = parseCSVHeader(lines[0]);
+  // Detect delimiter from first line
+  const delimiter = detectDelimiter(csvString);
+
+  // Parse header row properly with detected delimiter
+  const headers = parseCSVHeader(lines[0], delimiter);
   const result: Record<string, string>[] = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -101,7 +135,7 @@ export function csvToArray(csvString: string): Record<string, string>[] {
           // Toggle quote state
           insideQuotes = !insideQuotes;
         }
-      } else if (char === ',' && !insideQuotes) {
+      } else if (char === delimiter && !insideQuotes) {
         // End of value
         values.push(currentValue.trim());
         currentValue = '';
