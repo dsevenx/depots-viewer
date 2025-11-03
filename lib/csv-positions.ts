@@ -1,5 +1,16 @@
 import { Position } from './db';
-import { arrayToCSV, csvToArray, downloadFile, ParseResult } from './csv-utils';
+import { arrayToCSV, csvToArray, downloadFile } from './csv-utils';
+
+export interface PositionImportRow extends Omit<Position, 'id'> {
+  _rowNumber: number;
+  _error?: string;
+}
+
+export interface PositionParseResult {
+  success: Omit<Position, 'id'>[];
+  errors: { row: number; error: string }[];
+  allRows: PositionImportRow[];
+}
 
 const POSITION_CSV_HEADERS = [
   'isin',
@@ -146,28 +157,49 @@ function parsePositionRow(
 }
 
 /**
- * Parses CSV and returns result with successful positions and errors
+ * Parses CSV and returns result with successful positions, errors, and all rows for preview
  */
 export function parsePositionCSV(
   csvContent: string,
   bankId: number
-): ParseResult<Omit<Position, 'id'>> {
+): PositionParseResult {
   const rows = csvToArray(csvContent);
   const success: Omit<Position, 'id'>[] = [];
   const errors: { row: number; error: string }[] = [];
+  const allRows: PositionImportRow[] = [];
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2; // +2 because: +1 for header, +1 for 1-based indexing
     try {
       const position = parsePositionRow(row, rowNumber, bankId);
       success.push(position);
+      allRows.push({
+        ...position,
+        _rowNumber: rowNumber
+      });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
       errors.push({
         row: rowNumber,
-        error: error instanceof Error ? error.message : 'Unbekannter Fehler'
+        error: errorMessage
+      });
+      // Create partial row for preview (with raw values)
+      allRows.push({
+        bankId,
+        isin: row.isin?.trim() || '',
+        ticker: row.ticker?.trim() || '',
+        assetType: (row.assetType?.trim().toLowerCase() as any) || 'stock',
+        purchaseDate: row.purchaseDate ? new Date(row.purchaseDate) : new Date(),
+        quantity: parseFloat(row.quantity) || 0,
+        purchasePrice: parseFloat(row.purchasePrice) || 0,
+        currency: (row.currency?.trim().toUpperCase() as any) || 'EUR',
+        notes: row.notes?.trim(),
+        createdAt: new Date(),
+        _rowNumber: rowNumber,
+        _error: errorMessage
       });
     }
   });
 
-  return { success, errors };
+  return { success, errors, allRows };
 }
