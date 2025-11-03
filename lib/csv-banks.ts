@@ -1,5 +1,16 @@
 import { Bank } from './db';
-import { arrayToCSV, csvToArray, downloadFile, ParseResult } from './csv-utils';
+import { arrayToCSV, csvToArray, downloadFile } from './csv-utils';
+
+export interface BankImportRow extends Omit<Bank, 'id'> {
+  _rowNumber: number;
+  _error?: string;
+}
+
+export interface BankParseResult {
+  success: Omit<Bank, 'id'>[];
+  errors: { row: number; error: string }[];
+  allRows: BankImportRow[];
+}
 
 const BANK_CSV_HEADERS = ['name', 'notes'];
 
@@ -57,25 +68,39 @@ function parseBankRow(row: Record<string, string>, rowIndex: number): Omit<Bank,
 }
 
 /**
- * Parses CSV and returns result with successful banks and errors
+ * Parses CSV and returns result with successful banks, errors, and all rows for preview
  */
-export function parseBankCSV(csvContent: string): ParseResult<Omit<Bank, 'id'>> {
+export function parseBankCSV(csvContent: string): BankParseResult {
   const rows = csvToArray(csvContent);
   const success: Omit<Bank, 'id'>[] = [];
   const errors: { row: number; error: string }[] = [];
+  const allRows: BankImportRow[] = [];
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2; // +2 because: +1 for header, +1 for 1-based indexing
     try {
       const bank = parseBankRow(row, rowNumber);
       success.push(bank);
+      allRows.push({
+        ...bank,
+        _rowNumber: rowNumber
+      });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
       errors.push({
         row: rowNumber,
-        error: error instanceof Error ? error.message : 'Unbekannter Fehler'
+        error: errorMessage
+      });
+      // Create partial row for preview (with raw values)
+      allRows.push({
+        name: row.name?.trim() || '',
+        notes: row.notes?.trim(),
+        createdAt: new Date(),
+        _rowNumber: rowNumber,
+        _error: errorMessage
       });
     }
   });
 
-  return { success, errors };
+  return { success, errors, allRows };
 }

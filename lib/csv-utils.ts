@@ -42,13 +42,43 @@ export function arrayToCSV<T extends Record<string, any>>(
 }
 
 /**
+ * Parses CSV header row
+ */
+function parseCSVHeader(line: string): string[] {
+  const headers: string[] = [];
+  let currentValue = '';
+  let insideQuotes = false;
+
+  for (let j = 0; j < line.length; j++) {
+    const char = line[j];
+
+    if (char === '"') {
+      if (insideQuotes && line[j + 1] === '"') {
+        currentValue += '"';
+        j++;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+    } else if (char === ',' && !insideQuotes) {
+      headers.push(currentValue.trim());
+      currentValue = '';
+    } else {
+      currentValue += char;
+    }
+  }
+  headers.push(currentValue.trim());
+  return headers;
+}
+
+/**
  * Parses CSV string to array of objects
  */
 export function csvToArray(csvString: string): Record<string, string>[] {
   const lines = csvString.trim().split('\n');
-  if (lines.length === 0) return [];
+  if (lines.length <= 1) return []; // Need at least header + 1 data row
 
-  const headers = lines[0].split(',').map(h => h.trim());
+  // Parse header row properly
+  const headers = parseCSVHeader(lines[0]);
   const result: Record<string, string>[] = [];
 
   for (let i = 1; i < lines.length; i++) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db, Bank } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,6 +13,7 @@ import {
 import { readFile } from '@/lib/csv-utils';
 
 export default function DepotsPage() {
+  const router = useRouter();
   const [isAddingBank, setIsAddingBank] = useState(false);
   const [bankName, setBankName] = useState('');
   const [bankNotes, setBankNotes] = useState('');
@@ -112,44 +114,11 @@ export default function DepotsPage() {
       const content = await readFile(file);
       const result = parseBankCSV(content);
 
-      // Import each successful bank individually
-      let importedCount = 0;
-      for (const bank of result.success) {
-        try {
-          await db.banks.add(bank);
-          importedCount++;
-        } catch (error) {
-          console.error('Failed to import bank:', bank.name, error);
-          result.errors.push({
-            row: -1,
-            error: `Fehler beim Speichern von "${bank.name}": ${
-              error instanceof Error ? error.message : 'Unbekannter Fehler'
-            }`
-          });
-        }
-      }
+      // Store result in sessionStorage
+      sessionStorage.setItem('banks_import_preview', JSON.stringify(result));
 
-      // Build result message
-      let message = `Import abgeschlossen:\n\n`;
-      message += `✓ ${importedCount} Bank(en) erfolgreich importiert\n`;
-
-      if (result.errors.length > 0) {
-        message += `\n✗ ${result.errors.length} Fehler:\n`;
-        result.errors.forEach(err => {
-          if (err.row > 0) {
-            message += `  Zeile ${err.row}: ${err.error}\n`;
-          } else {
-            message += `  ${err.error}\n`;
-          }
-        });
-      }
-
-      alert(message);
-
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      // Navigate to preview page
+      router.push('/depots/import-preview');
     } catch (error) {
       console.error('Import failed:', error);
       alert(
