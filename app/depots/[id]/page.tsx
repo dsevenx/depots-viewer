@@ -1,15 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { db, Bank, Position } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
+import {
+  downloadExamplePositionCSV,
+  exportPositionsToCSV,
+  parsePositionCSV,
+} from '@/lib/csv-positions';
+import { readFile } from '@/lib/csv-utils';
 
 export default function BankDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bankId = parseInt(params.id as string);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isAddingPosition, setIsAddingPosition] = useState(false);
   const [formData, setFormData] = useState({
@@ -188,6 +195,48 @@ export default function BankDetailPage() {
     return new Date(date).toLocaleDateString('de-DE');
   };
 
+  // CSV Handlers
+  const handleExportPositions = () => {
+    if (!positions || positions.length === 0) {
+      alert('Keine Positionen zum Exportieren vorhanden');
+      return;
+    }
+    if (!bank) return;
+    exportPositionsToCSV(positions, bank.name);
+  };
+
+  const handleImportPositions = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await readFile(file);
+      const positionsToImport = parsePositionCSV(content, bankId);
+
+      // Import positions to database
+      await db.positions.bulkAdd(positionsToImport);
+
+      alert(`${positionsToImport.length} Position(en) erfolgreich importiert`);
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert(
+        `Fehler beim Importieren: ${
+          error instanceof Error ? error.message : 'Unbekannter Fehler'
+        }`
+      );
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   if (!bank) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black flex items-center justify-center">
@@ -222,6 +271,32 @@ export default function BankDetailPage() {
             {bank.notes && (
               <p className="text-zinc-600 dark:text-zinc-400">{bank.notes}</p>
             )}
+          </div>
+
+          {/* CSV Buttons */}
+          <div className="mb-6 flex flex-wrap gap-3">
+            <button
+              onClick={downloadExamplePositionCSV}
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm"
+            >
+              📄 Beispiel-CSV herunterladen
+            </button>
+            <button
+              onClick={handleExportPositions}
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm"
+            >
+              💾 Positionen exportieren
+            </button>
+            <label className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm">
+              📥 Positionen importieren
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImportPositions}
+                className="hidden"
+              />
+            </label>
           </div>
 
           {/* Add Position Button */}

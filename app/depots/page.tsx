@@ -1,9 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { db, Bank } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
+import {
+  downloadExampleBankCSV,
+  exportBanksToCSV,
+  parseBankCSV,
+} from '@/lib/csv-banks';
+import { readFile } from '@/lib/csv-utils';
 
 export default function DepotsPage() {
   const [isAddingBank, setIsAddingBank] = useState(false);
@@ -12,6 +18,7 @@ export default function DepotsPage() {
   const [editingBankId, setEditingBankId] = useState<number | null>(null);
   const [editBankName, setEditBankName] = useState('');
   const [editBankNotes, setEditBankNotes] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Live query - updates automatically when data changes
   const banks = useLiveQuery(() => db.banks.toArray());
@@ -88,6 +95,47 @@ export default function DepotsPage() {
     setEditBankNotes('');
   };
 
+  // CSV Handlers
+  const handleExportBanks = () => {
+    if (!banks || banks.length === 0) {
+      alert('Keine Banken zum Exportieren vorhanden');
+      return;
+    }
+    exportBanksToCSV(banks);
+  };
+
+  const handleImportBanks = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const content = await readFile(file);
+      const banksToImport = parseBankCSV(content);
+
+      // Import banks to database
+      await db.banks.bulkAdd(banksToImport);
+
+      alert(`${banksToImport.length} Bank(en) erfolgreich importiert`);
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      alert(
+        `Fehler beim Importieren: ${
+          error instanceof Error ? error.message : 'Unbekannter Fehler'
+        }`
+      );
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
       <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
@@ -100,6 +148,32 @@ export default function DepotsPage() {
             <p className="text-zinc-600 dark:text-zinc-400">
               Verwalte deine Banken und Broker
             </p>
+          </div>
+
+          {/* CSV Buttons */}
+          <div className="mb-6 flex flex-wrap gap-3">
+            <button
+              onClick={downloadExampleBankCSV}
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm"
+            >
+              📄 Beispiel-CSV herunterladen
+            </button>
+            <button
+              onClick={handleExportBanks}
+              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm"
+            >
+              💾 Banken exportieren
+            </button>
+            <label className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm">
+              📥 Banken importieren
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImportBanks}
+                className="hidden"
+              />
+            </label>
           </div>
 
           {/* Add Bank Button */}
