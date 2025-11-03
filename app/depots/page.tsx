@@ -152,18 +152,21 @@ export default function DepotsPage() {
           <div className="mb-6 flex flex-wrap gap-3">
             <button
               onClick={downloadExampleBankCSV}
-              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm"
+              className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
             >
-              📄 Beispiel-CSV herunterladen
+              <span>📄</span>
+              <span>Beispiel-CSV herunterladen</span>
             </button>
             <button
               onClick={handleExportBanks}
-              className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-sm"
+              className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
             >
-              💾 Banken exportieren
+              <span>💾</span>
+              <span>Banken exportieren</span>
             </button>
-            <label className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer text-sm">
-              📥 Banken importieren
+            <label className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors cursor-pointer text-sm inline-flex items-center gap-2">
+              <span>📥</span>
+              <span>Banken importieren</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -178,9 +181,10 @@ export default function DepotsPage() {
           {!isAddingBank && (
             <button
               onClick={() => setIsAddingBank(true)}
-              className="mb-6 px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors"
+              className="mb-6 px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors inline-flex items-center gap-2"
             >
-              + Bank hinzufügen
+              <span>➕</span>
+              <span>Bank hinzufügen</span>
             </button>
           )}
 

@@ -222,23 +222,26 @@ export default function PositionImportPreviewPage() {
             <button
               onClick={handleCancel}
               disabled={isProcessing}
-              className="px-6 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
-              Abbrechen
+              <span>✕</span>
+              <span>Abbrechen</span>
             </button>
             <button
               onClick={handleOverwrite}
               disabled={!canImport || isProcessing}
-              className="px-6 py-3 bg-orange-600 dark:bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-700 dark:hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
-              {isProcessing ? 'Wird importiert...' : 'Depot überschreiben'}
+              <span>🔄</span>
+              <span>{isProcessing ? 'Wird importiert...' : 'Depot überschreiben'}</span>
             </button>
             <button
               onClick={handleAppend}
               disabled={!canImport || isProcessing}
-              className="px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
-              {isProcessing ? 'Wird importiert...' : 'Depot ergänzen'}
+              <span>➕</span>
+              <span>{isProcessing ? 'Wird importiert...' : 'Depot ergänzen'}</span>
             </button>
           </div>
 
