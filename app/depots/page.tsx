@@ -183,7 +183,7 @@ export default function DepotsPage() {
               onClick={() => setIsAddingBank(true)}
               className="mb-6 px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors inline-flex items-center gap-2"
             >
-              <span>➕</span>
+              <span className="text-xl opacity-90">⊕</span>
               <span>Bank hinzufügen</span>
             </button>
           )}
