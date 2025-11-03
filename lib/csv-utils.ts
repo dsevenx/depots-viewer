@@ -3,6 +3,14 @@
  */
 
 /**
+ * Result of parsing a CSV file
+ */
+export interface ParseResult<T> {
+  success: T[];
+  errors: { row: number; error: string }[];
+}
+
+/**
  * Converts an array of objects to CSV string
  */
 export function arrayToCSV<T extends Record<string, any>>(
