@@ -211,12 +211,41 @@ export default function BankDetailPage() {
 
     try {
       const content = await readFile(file);
-      const positionsToImport = parsePositionCSV(content, bankId);
+      const result = parsePositionCSV(content, bankId);
 
-      // Import positions to database
-      await db.positions.bulkAdd(positionsToImport);
+      // Import each successful position individually
+      let importedCount = 0;
+      for (const position of result.success) {
+        try {
+          await db.positions.add(position);
+          importedCount++;
+        } catch (error) {
+          console.error('Failed to import position:', position.ticker, error);
+          result.errors.push({
+            row: -1,
+            error: `Fehler beim Speichern von "${position.ticker}": ${
+              error instanceof Error ? error.message : 'Unbekannter Fehler'
+            }`
+          });
+        }
+      }
 
-      alert(`${positionsToImport.length} Position(en) erfolgreich importiert`);
+      // Build result message
+      let message = `Import abgeschlossen:\n\n`;
+      message += `✓ ${importedCount} Position(en) erfolgreich importiert\n`;
+
+      if (result.errors.length > 0) {
+        message += `\n✗ ${result.errors.length} Fehler:\n`;
+        result.errors.forEach(err => {
+          if (err.row > 0) {
+            message += `  Zeile ${err.row}: ${err.error}\n`;
+          } else {
+            message += `  ${err.error}\n`;
+          }
+        });
+      }
+
+      alert(message);
 
       // Reset file input
       if (fileInputRef.current) {
@@ -225,7 +254,7 @@ export default function BankDetailPage() {
     } catch (error) {
       console.error('Import failed:', error);
       alert(
-        `Fehler beim Importieren: ${
+        `Fehler beim Lesen der Datei: ${
           error instanceof Error ? error.message : 'Unbekannter Fehler'
         }`
       );

@@ -1,5 +1,5 @@
 import { Bank } from './db';
-import { arrayToCSV, csvToArray, downloadFile } from './csv-utils';
+import { arrayToCSV, csvToArray, downloadFile, ParseResult } from './csv-utils';
 
 const BANK_CSV_HEADERS = ['name', 'notes'];
 
@@ -42,20 +42,40 @@ export function exportBanksToCSV(banks: Bank[]) {
 }
 
 /**
- * Parses CSV and returns array of banks (without id and createdAt)
+ * Parses a single bank row from CSV
  */
-export function parseBankCSV(csvContent: string): Omit<Bank, 'id' | 'createdAt'>[] {
+function parseBankRow(row: Record<string, string>, rowIndex: number): Omit<Bank, 'id'> {
+  if (!row.name || !row.name.trim()) {
+    throw new Error('Bank-Name ist ein Pflichtfeld');
+  }
+
+  return {
+    name: row.name.trim(),
+    notes: row.notes?.trim() || undefined,
+    createdAt: new Date()
+  };
+}
+
+/**
+ * Parses CSV and returns result with successful banks and errors
+ */
+export function parseBankCSV(csvContent: string): ParseResult<Omit<Bank, 'id'>> {
   const rows = csvToArray(csvContent);
+  const success: Omit<Bank, 'id'>[] = [];
+  const errors: { row: number; error: string }[] = [];
 
-  return rows.map(row => {
-    if (!row.name || !row.name.trim()) {
-      throw new Error('Bank-Name ist ein Pflichtfeld');
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2; // +2 because: +1 for header, +1 for 1-based indexing
+    try {
+      const bank = parseBankRow(row, rowNumber);
+      success.push(bank);
+    } catch (error) {
+      errors.push({
+        row: rowNumber,
+        error: error instanceof Error ? error.message : 'Unbekannter Fehler'
+      });
     }
-
-    return {
-      name: row.name.trim(),
-      notes: row.notes?.trim() || undefined,
-      createdAt: new Date()
-    };
   });
+
+  return { success, errors };
 }
