@@ -258,7 +258,7 @@ export default function BankDetailPage() {
           <div className="mb-8">
             <Link
               href="/depots"
-              className="text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 mb-2 inline-block"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors mb-2"
             >
               ← Zurück zur Übersicht
             </Link>
@@ -270,44 +270,42 @@ export default function BankDetailPage() {
             )}
           </div>
 
-          {/* CSV Buttons */}
-          <div className="mb-6 flex flex-wrap gap-3">
-            <button
-              onClick={downloadExamplePositionCSV}
-              className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
-            >
-              <span>📄</span>
-              <span>Beispiel-CSV herunterladen</span>
-            </button>
-            <button
-              onClick={handleExportPositions}
-              className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
-            >
-              <span>💾</span>
-              <span>Positionen exportieren</span>
-            </button>
-            <label className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors cursor-pointer text-sm inline-flex items-center gap-2">
-              <span>📥</span>
-              <span>Positionen importieren</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleImportPositions}
-                className="hidden"
-              />
-            </label>
-          </div>
-
-          {/* Add Position Button */}
+          {/* Action Buttons */}
           {!isAddingPosition && (
-            <button
-              onClick={() => setIsAddingPosition(true)}
-              className="mb-6 px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors inline-flex items-center gap-2"
-            >
-              <span>➕</span>
-              <span>Position hinzufügen</span>
-            </button>
+            <div className="mb-6 flex flex-wrap gap-3">
+              <button
+                onClick={() => setIsAddingPosition(true)}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
+              >
+                <span>➕</span>
+                <span>Position hinzufügen</span>
+              </button>
+              <button
+                onClick={downloadExamplePositionCSV}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
+              >
+                <span>📄</span>
+                <span>Beispiel-CSV herunterladen</span>
+              </button>
+              <button
+                onClick={handleExportPositions}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
+              >
+                <span>💾</span>
+                <span>Positionen exportieren</span>
+              </button>
+              <label className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors cursor-pointer text-sm inline-flex items-center gap-2">
+                <span>📥</span>
+                <span>Positionen importieren</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportPositions}
+                  className="hidden"
+                />
+              </label>
+            </div>
           )}
 
           {/* Add Position Form */}
