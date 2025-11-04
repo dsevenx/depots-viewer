@@ -42,6 +42,19 @@ export default function BankDetailPage() {
     notes: '',
   });
 
+  // Stock prices state
+  interface StockPrice {
+    currentPrice: number;
+    currency: string;
+    dividendRate?: number;
+    dividendYield?: number;
+    trailingDividendRate?: number;
+    name?: string;
+  }
+
+  const [stockPrices, setStockPrices] = useState<Record<string, StockPrice>>({});
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+
   // Live queries
   const bank = useLiveQuery(() => db.banks.get(bankId));
   const positions = useLiveQuery(
@@ -234,6 +247,57 @@ export default function BankDetailPage() {
     }
   };
 
+  // Stock Price Handlers
+  const handleFetchPrices = async () => {
+    if (!positions || positions.length === 0) {
+      alert('Keine Positionen zum Aktualisieren vorhanden');
+      return;
+    }
+
+    setIsLoadingPrices(true);
+    const newPrices: Record<string, StockPrice> = {};
+    const errors: string[] = [];
+
+    try {
+      // Fetch prices for all positions
+      await Promise.all(
+        positions.map(async (position) => {
+          try {
+            const response = await fetch(`/api/stock/${position.ticker}`);
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            newPrices[position.ticker] = {
+              currentPrice: data.currentPrice,
+              currency: data.currency,
+              dividendRate: data.dividendRate,
+              dividendYield: data.dividendYield,
+              trailingDividendRate: data.trailingDividendRate,
+              name: data.name,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch price for ${position.ticker}:`, error);
+            errors.push(position.ticker);
+          }
+        })
+      );
+
+      setStockPrices(newPrices);
+
+      if (errors.length > 0) {
+        alert(
+          `Kurse aktualisiert. Folgende Ticker konnten nicht geladen werden: ${errors.join(', ')}`
+        );
+      }
+    } catch (error) {
+      console.error('Failed to fetch prices:', error);
+      alert('Fehler beim Aktualisieren der Kurse');
+    } finally {
+      setIsLoadingPrices(false);
+    }
+  };
+
   if (!bank) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black flex items-center justify-center">
@@ -279,6 +343,14 @@ export default function BankDetailPage() {
               >
                 <span>➕</span>
                 <span>Position hinzufügen</span>
+              </button>
+              <button
+                onClick={handleFetchPrices}
+                disabled={isLoadingPrices || !positions || positions.length === 0}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{isLoadingPrices ? '⏳' : '📈'}</span>
+                <span>{isLoadingPrices ? 'Lädt...' : 'Kurse aktualisieren'}</span>
               </button>
               <button
                 onClick={downloadExamplePositionCSV}
@@ -461,6 +533,68 @@ export default function BankDetailPage() {
             </div>
           )}
 
+          {/* Portfolio Summary */}
+          {positions && positions.length > 0 && Object.keys(stockPrices).length > 0 && (
+            <div className="mb-6 bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+                Portfolio-Übersicht
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-500">Einkaufswert</p>
+                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {formatCurrency(
+                      positions.reduce((sum, p) => sum + p.quantity * p.purchasePrice, 0),
+                      'EUR'
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-500">Aktueller Wert</p>
+                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {formatCurrency(
+                      positions.reduce((sum, p) => {
+                        const price = stockPrices[p.ticker];
+                        return sum + (price ? p.quantity * price.currentPrice : p.quantity * p.purchasePrice);
+                      }, 0),
+                      'EUR'
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-500">Gewinn/Verlust</p>
+                  <p className={`text-xl font-bold ${
+                    positions.reduce((sum, p) => {
+                      const price = stockPrices[p.ticker];
+                      const current = price ? p.quantity * price.currentPrice : p.quantity * p.purchasePrice;
+                      const purchase = p.quantity * p.purchasePrice;
+                      return sum + (current - purchase);
+                    }, 0) >= 0
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-red-600 dark:text-red-400'
+                  }`}>
+                    {formatCurrency(
+                      positions.reduce((sum, p) => {
+                        const price = stockPrices[p.ticker];
+                        const current = price ? p.quantity * price.currentPrice : p.quantity * p.purchasePrice;
+                        const purchase = p.quantity * p.purchasePrice;
+                        return sum + (current - purchase);
+                      }, 0),
+                      'EUR'
+                    )}
+                    {' '}
+                    ({(positions.reduce((sum, p) => {
+                      const price = stockPrices[p.ticker];
+                      const current = price ? p.quantity * price.currentPrice : p.quantity * p.purchasePrice;
+                      const purchase = p.quantity * p.purchasePrice;
+                      return sum + (current - purchase);
+                    }, 0) / positions.reduce((sum, p) => sum + p.quantity * p.purchasePrice, 0) * 100).toFixed(2)}%)
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Positions List */}
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
@@ -477,6 +611,10 @@ export default function BankDetailPage() {
               positions.map((position) => {
                 const totalValue = position.quantity * position.purchasePrice;
                 const isEditing = editingPositionId === position.id;
+                const stockPrice = stockPrices[position.ticker];
+                const currentValue = stockPrice ? position.quantity * stockPrice.currentPrice : null;
+                const gain = currentValue ? currentValue - totalValue : null;
+                const gainPercent = gain && totalValue ? (gain / totalValue) * 100 : null;
 
                 return (
                   <div
@@ -620,10 +758,65 @@ export default function BankDetailPage() {
                             <span className="px-2 py-1 text-xs font-medium bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded">
                               {position.assetType === 'stock' ? 'Aktie' : position.assetType === 'etf' ? 'ETF' : 'Anleihe'}
                             </span>
+                            {stockPrice && gainPercent !== null && (
+                              <span className={`px-2 py-1 text-xs font-medium rounded ${
+                                gainPercent >= 0
+                                  ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                  : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                              }`}>
+                                {gainPercent >= 0 ? '+' : ''}{gainPercent.toFixed(2)}%
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
                             ISIN: {position.isin}
+                            {stockPrice?.name && <span className="ml-2">• {stockPrice.name}</span>}
                           </p>
+
+                          {/* Current Price Info */}
+                          {stockPrice && (
+                            <div className="mb-3 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                <div>
+                                  <p className="text-zinc-500 dark:text-zinc-500">Aktueller Kurs</p>
+                                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                    {formatCurrency(stockPrice.currentPrice, stockPrice.currency)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-zinc-500 dark:text-zinc-500">Aktueller Wert</p>
+                                  <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                    {currentValue && formatCurrency(currentValue, position.currency)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-zinc-500 dark:text-zinc-500">Gewinn/Verlust</p>
+                                  <p className={`font-medium ${
+                                    gain && gain >= 0
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {gain && formatCurrency(gain, position.currency)}
+                                  </p>
+                                </div>
+                                {stockPrice.dividendRate && (
+                                  <div>
+                                    <p className="text-zinc-500 dark:text-zinc-500">Div. (geschätzt)</p>
+                                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                      {formatCurrency(stockPrice.dividendRate, stockPrice.currency)}
+                                      {stockPrice.dividendYield && (
+                                        <span className="text-xs text-zinc-500 ml-1">
+                                          ({(stockPrice.dividendYield * 100).toFixed(2)}%)
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Purchase Info */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                             <div>
                               <p className="text-zinc-500 dark:text-zinc-500">Anzahl</p>
@@ -638,7 +831,7 @@ export default function BankDetailPage() {
                               </p>
                             </div>
                             <div>
-                              <p className="text-zinc-500 dark:text-zinc-500">Gesamtwert</p>
+                              <p className="text-zinc-500 dark:text-zinc-500">Kaufwert gesamt</p>
                               <p className="font-medium text-zinc-900 dark:text-zinc-50">
                                 {formatCurrency(totalValue, position.currency)}
                               </p>
