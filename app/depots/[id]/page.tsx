@@ -11,6 +11,7 @@ import {
   parsePositionCSV,
 } from '@/lib/csv-positions';
 import { readFile } from '@/lib/csv-utils';
+import { Dropdown } from '@/app/components/Dropdown';
 
 export default function BankDetailPage() {
   const params = useParams();
@@ -304,7 +305,7 @@ export default function BankDetailPage() {
               onClick={() => setIsAddingPosition(true)}
               className="mb-6 px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors inline-flex items-center gap-2"
             >
-              <span className="text-xl opacity-90">⊕</span>
+              <span>➕</span>
               <span>Position hinzufügen</span>
             </button>
           )}
@@ -347,24 +348,17 @@ export default function BankDetailPage() {
                       className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                     />
                   </div>
-                  <div>
-                    <label htmlFor="assetType" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Asset-Typ *
-                    </label>
-                    <select
-                      id="assetType"
-                      name="assetType"
-                      value={formData.assetType}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50 appearance-none bg-no-repeat bg-right pr-10 cursor-pointer [&>option]:bg-white [&>option]:text-zinc-900 [&>option]:py-2 [&>option:checked]:bg-zinc-100 [&>option:checked]:font-semibold"
-                      style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E\")", backgroundPosition: "right 0.75rem center", backgroundSize: "12px" }}
-                    >
-                      <option value="stock">Aktie</option>
-                      <option value="etf">ETF</option>
-                      <option value="bond">Anleihe</option>
-                    </select>
-                  </div>
+                  <Dropdown
+                    label="Asset-Typ"
+                    value={formData.assetType}
+                    onChange={(value) => setFormData(prev => ({ ...prev, assetType: value as 'stock' | 'etf' | 'bond' }))}
+                    options={[
+                      { value: 'stock', label: 'Aktie' },
+                      { value: 'etf', label: 'ETF' },
+                      { value: 'bond', label: 'Anleihe' },
+                    ]}
+                    required
+                  />
                   <div>
                     <label htmlFor="purchaseDate" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       Kaufdatum *
@@ -413,23 +407,16 @@ export default function BankDetailPage() {
                       className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                     />
                   </div>
-                  <div>
-                    <label htmlFor="currency" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Währung *
-                    </label>
-                    <select
-                      id="currency"
-                      name="currency"
-                      value={formData.currency}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50 appearance-none bg-no-repeat bg-right pr-10 cursor-pointer [&>option]:bg-white [&>option]:text-zinc-900 [&>option]:py-2 [&>option:checked]:bg-zinc-100 [&>option:checked]:font-semibold"
-                      style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E\")", backgroundPosition: "right 0.75rem center", backgroundSize: "12px" }}
-                    >
-                      <option value="EUR">EUR</option>
-                      <option value="USD">USD</option>
-                    </select>
-                  </div>
+                  <Dropdown
+                    label="Währung"
+                    value={formData.currency}
+                    onChange={(value) => setFormData(prev => ({ ...prev, currency: value as 'EUR' | 'USD' }))}
+                    options={[
+                      { value: 'EUR', label: 'EUR' },
+                      { value: 'USD', label: 'USD' },
+                    ]}
+                    required
+                  />
                   <div className="sm:col-span-2">
                     <label htmlFor="notes" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       Notizen (optional)
@@ -531,23 +518,17 @@ export default function BankDetailPage() {
                               className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                             />
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                              Asset-Typ *
-                            </label>
-                            <select
-                              name="assetType"
-                              value={editFormData.assetType}
-                              onChange={handleEditInputChange}
-                              required
-                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50 appearance-none bg-no-repeat bg-right pr-10 cursor-pointer [&>option]:bg-white [&>option]:text-zinc-900 [&>option]:py-2 [&>option:checked]:bg-zinc-100 [&>option:checked]:font-semibold"
-                              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E\")", backgroundPosition: "right 0.75rem center", backgroundSize: "12px" }}
-                            >
-                              <option value="stock">Aktie</option>
-                              <option value="etf">ETF</option>
-                              <option value="bond">Anleihe</option>
-                            </select>
-                          </div>
+                          <Dropdown
+                            label="Asset-Typ"
+                            value={editFormData.assetType}
+                            onChange={(value) => setEditFormData(prev => ({ ...prev, assetType: value as 'stock' | 'etf' | 'bond' }))}
+                            options={[
+                              { value: 'stock', label: 'Aktie' },
+                              { value: 'etf', label: 'ETF' },
+                              { value: 'bond', label: 'Anleihe' },
+                            ]}
+                            required
+                          />
                           <div>
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                               Kaufdatum *
@@ -591,22 +572,16 @@ export default function BankDetailPage() {
                               className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                             />
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                              Währung *
-                            </label>
-                            <select
-                              name="currency"
-                              value={editFormData.currency}
-                              onChange={handleEditInputChange}
-                              required
-                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50 appearance-none bg-no-repeat bg-right pr-10 cursor-pointer [&>option]:bg-white [&>option]:text-zinc-900 [&>option]:py-2 [&>option:checked]:bg-zinc-100 [&>option:checked]:font-semibold"
-                              style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E\")", backgroundPosition: "right 0.75rem center", backgroundSize: "12px" }}
-                            >
-                              <option value="EUR">EUR</option>
-                              <option value="USD">USD</option>
-                            </select>
-                          </div>
+                          <Dropdown
+                            label="Währung"
+                            value={editFormData.currency}
+                            onChange={(value) => setEditFormData(prev => ({ ...prev, currency: value as 'EUR' | 'USD' }))}
+                            options={[
+                              { value: 'EUR', label: 'EUR' },
+                              { value: 'USD', label: 'USD' },
+                            ]}
+                            required
+                          />
                           <div className="sm:col-span-2">
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                               Notizen (optional)
