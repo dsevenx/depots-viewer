@@ -240,7 +240,7 @@ export default function PositionImportPreviewPage() {
               disabled={!canImport || isProcessing}
               className="px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
             >
-              <span>➕</span>
+              <span className="text-xl opacity-90">⊕</span>
               <span>{isProcessing ? 'Wird importiert...' : 'Depot ergänzen'}</span>
             </button>
           </div>
