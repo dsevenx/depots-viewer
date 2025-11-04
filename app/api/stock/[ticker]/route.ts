@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
+
+const yahooFinance = new YahooFinance();
 
 // In-memory cache for stock data
 interface CachedStockData {
@@ -49,11 +51,9 @@ export async function GET(
     }
 
     // Fetch from Yahoo Finance
-    const result = await yahooFinance.quoteSummary(tickerUpper, {
-      modules: ['price', 'summaryDetail'],
-    });
+    const quote = await yahooFinance.quote(tickerUpper);
 
-    if (!result || !result.price) {
+    if (!quote) {
       return NextResponse.json(
         { error: 'Stock data not found' },
         { status: 404 }
@@ -62,13 +62,13 @@ export async function GET(
 
     const stockData: StockData = {
       ticker: tickerUpper,
-      currentPrice: result.price.regularMarketPrice || 0,
-      currency: result.price.currency || 'USD',
-      name: result.price.shortName || result.price.longName,
-      dividendRate: result.summaryDetail?.dividendRate,
-      dividendYield: result.summaryDetail?.dividendYield,
-      trailingDividendRate: result.summaryDetail?.trailingAnnualDividendRate,
-      trailingDividendYield: result.summaryDetail?.trailingAnnualDividendYield,
+      currentPrice: quote.regularMarketPrice || 0,
+      currency: quote.currency || 'USD',
+      name: quote.shortName || quote.longName,
+      dividendRate: quote.dividendRate,
+      dividendYield: quote.dividendYield,
+      trailingDividendRate: quote.trailingAnnualDividendRate,
+      trailingDividendYield: quote.trailingAnnualDividendYield,
     };
 
     // Store in cache

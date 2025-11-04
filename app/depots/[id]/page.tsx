@@ -12,7 +12,7 @@ import {
 } from '@/lib/csv-positions';
 import { readFile } from '@/lib/csv-utils';
 import { DropdownDepotViewer } from '@/app/components/DropdownDepotViewer';
- 
+
 export default function BankDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -149,7 +149,7 @@ export default function BankDetailPage() {
     e.preventDefault();
 
     if (!editFormData.isin || !editFormData.ticker || !editFormData.purchaseDate ||
-        !editFormData.quantity || !editFormData.purchasePrice || !editingPositionId) {
+      !editFormData.quantity || !editFormData.purchasePrice || !editingPositionId) {
       alert('Bitte fülle alle Pflichtfelder aus');
       return;
     }
@@ -235,8 +235,7 @@ export default function BankDetailPage() {
     } catch (error) {
       console.error('Import failed:', error);
       alert(
-        `Fehler beim Lesen der Datei: ${
-          error instanceof Error ? error.message : 'Unbekannter Fehler'
+        `Fehler beim Lesen der Datei: ${error instanceof Error ? error.message : 'Unbekannter Fehler'
         }`
       );
 
@@ -265,17 +264,19 @@ export default function BankDetailPage() {
           try {
             const response = await fetch(`/api/stock/${position.ticker}`);
             if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
+              errors.push(position.ticker);
+            } else {
+              const data = await response.json();
+              newPrices[position.ticker] = {
+                currentPrice: data.currentPrice,
+                currency: data.currency,
+                dividendRate: data.dividendRate,
+                dividendYield: data.dividendYield,
+                trailingDividendRate: data.trailingDividendRate,
+                name: data.name,
+              };
             }
-            const data = await response.json();
-            newPrices[position.ticker] = {
-              currentPrice: data.currentPrice,
-              currency: data.currency,
-              dividendRate: data.dividendRate,
-              dividendYield: data.dividendYield,
-              trailingDividendRate: data.trailingDividendRate,
-              name: data.name,
-            };
+
           } catch (error) {
             console.error(`Failed to fetch price for ${position.ticker}:`, error);
             errors.push(position.ticker);
@@ -563,16 +564,15 @@ export default function BankDetailPage() {
                 </div>
                 <div>
                   <p className="text-sm text-zinc-500 dark:text-zinc-500">Gewinn/Verlust</p>
-                  <p className={`text-xl font-bold ${
-                    positions.reduce((sum, p) => {
-                      const price = stockPrices[p.ticker];
-                      const current = price ? p.quantity * price.currentPrice : p.quantity * p.purchasePrice;
-                      const purchase = p.quantity * p.purchasePrice;
-                      return sum + (current - purchase);
-                    }, 0) >= 0
+                  <p className={`text-xl font-bold ${positions.reduce((sum, p) => {
+                    const price = stockPrices[p.ticker];
+                    const current = price ? p.quantity * price.currentPrice : p.quantity * p.purchasePrice;
+                    const purchase = p.quantity * p.purchasePrice;
+                    return sum + (current - purchase);
+                  }, 0) >= 0
                       ? 'text-green-600 dark:text-green-400'
                       : 'text-red-600 dark:text-red-400'
-                  }`}>
+                    }`}>
                     {formatCurrency(
                       positions.reduce((sum, p) => {
                         const price = stockPrices[p.ticker];
@@ -759,11 +759,10 @@ export default function BankDetailPage() {
                               {position.assetType === 'stock' ? 'Aktie' : position.assetType === 'etf' ? 'ETF' : 'Anleihe'}
                             </span>
                             {stockPrice && gainPercent !== null && (
-                              <span className={`px-2 py-1 text-xs font-medium rounded ${
-                                gainPercent >= 0
+                              <span className={`px-2 py-1 text-xs font-medium rounded ${gainPercent >= 0
                                   ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400'
                                   : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                              }`}>
+                                }`}>
                                 {gainPercent >= 0 ? '+' : ''}{gainPercent.toFixed(2)}%
                               </span>
                             )}
@@ -791,11 +790,10 @@ export default function BankDetailPage() {
                                 </div>
                                 <div>
                                   <p className="text-zinc-500 dark:text-zinc-500">Gewinn/Verlust</p>
-                                  <p className={`font-medium ${
-                                    gain && gain >= 0
+                                  <p className={`font-medium ${gain && gain >= 0
                                       ? 'text-green-600 dark:text-green-400'
                                       : 'text-red-600 dark:text-red-400'
-                                  }`}>
+                                    }`}>
                                     {gain && formatCurrency(gain, position.currency)}
                                   </p>
                                 </div>
