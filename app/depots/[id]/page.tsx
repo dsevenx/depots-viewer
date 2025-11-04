@@ -11,7 +11,7 @@ import {
   parsePositionCSV,
 } from '@/lib/csv-positions';
 import { readFile } from '@/lib/csv-utils';
-import { Dropdown } from '@/app/components/DropDown';
+import { DropdownDepotViewer } from '@/app/components/DropdownDepotViewer';
  
 export default function BankDetailPage() {
   const params = useParams();
@@ -348,7 +348,7 @@ export default function BankDetailPage() {
                       className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                     />
                   </div>
-                  <Dropdown
+                  <DropdownDepotViewer
                     label="Asset-Typ"
                     value={formData.assetType}
                     onChange={(value) => setFormData(prev => ({ ...prev, assetType: value as 'stock' | 'etf' | 'bond' }))}
@@ -407,7 +407,7 @@ export default function BankDetailPage() {
                       className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                     />
                   </div>
-                  <Dropdown
+                  <DropdownDepotViewer
                     label="Währung"
                     value={formData.currency}
                     onChange={(value) => setFormData(prev => ({ ...prev, currency: value as 'EUR' | 'USD' }))}
@@ -518,7 +518,7 @@ export default function BankDetailPage() {
                               className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                             />
                           </div>
-                          <Dropdown
+                          <DropdownDepotViewer
                             label="Asset-Typ"
                             value={editFormData.assetType}
                             onChange={(value) => setEditFormData(prev => ({ ...prev, assetType: value as 'stock' | 'etf' | 'bond' }))}
@@ -572,7 +572,7 @@ export default function BankDetailPage() {
                               className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                             />
                           </div>
-                          <Dropdown
+                          <DropdownDepotViewer
                             label="Währung"
                             value={editFormData.currency}
                             onChange={(value) => setEditFormData(prev => ({ ...prev, currency: value as 'EUR' | 'USD' }))}

@@ -17,7 +17,7 @@ export interface DropdownProps {
   className?: string;
 }
 
-export const Dropdown: React.FC<DropdownProps> = ({
+export const DropdownDepotViewer: React.FC<DropdownProps> = ({
   value,
   onChange,
   options,
