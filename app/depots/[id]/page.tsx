@@ -12,7 +12,7 @@ import {
 } from '@/lib/csv-positions';
 import { readFile } from '@/lib/csv-utils';
 import { Dropdown } from '@/app/components/Dropdown';
-
+ 
 export default function BankDetailPage() {
   const params = useParams();
   const router = useRouter();
