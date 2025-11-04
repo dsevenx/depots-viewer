@@ -11,7 +11,7 @@ import {
   parsePositionCSV,
 } from '@/lib/csv-positions';
 import { readFile } from '@/lib/csv-utils';
-import { Dropdown } from '@/app/components/Dropdown';
+import { Dropdown } from '@/app/components/Dropdownx';
  
 export default function BankDetailPage() {
   const params = useParams();
