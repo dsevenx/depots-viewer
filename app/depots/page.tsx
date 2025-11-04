@@ -148,44 +148,42 @@ export default function DepotsPage() {
             </p>
           </div>
 
-          {/* CSV Buttons */}
-          <div className="mb-6 flex flex-wrap gap-3">
-            <button
-              onClick={downloadExampleBankCSV}
-              className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
-            >
-              <span>📄</span>
-              <span>Beispiel-CSV herunterladen</span>
-            </button>
-            <button
-              onClick={handleExportBanks}
-              className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
-            >
-              <span>💾</span>
-              <span>Banken exportieren</span>
-            </button>
-            <label className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors cursor-pointer text-sm inline-flex items-center gap-2">
-              <span>📥</span>
-              <span>Banken importieren</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleImportBanks}
-                className="hidden"
-              />
-            </label>
-          </div>
-
-          {/* Add Bank Button */}
+          {/* Action Buttons */}
           {!isAddingBank && (
-            <button
-              onClick={() => setIsAddingBank(true)}
-              className="mb-6 px-6 py-3 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors inline-flex items-center gap-2"
-            >
-              <span>➕</span>
-              <span>Bank hinzufügen</span>
-            </button>
+            <div className="mb-6 flex flex-wrap gap-3">
+              <button
+                onClick={() => setIsAddingBank(true)}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
+              >
+                <span>➕</span>
+                <span>Bank hinzufügen</span>
+              </button>
+              <button
+                onClick={downloadExampleBankCSV}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
+              >
+                <span>📄</span>
+                <span>Beispiel-CSV herunterladen</span>
+              </button>
+              <button
+                onClick={handleExportBanks}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
+              >
+                <span>💾</span>
+                <span>Banken exportieren</span>
+              </button>
+              <label className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors cursor-pointer text-sm inline-flex items-center gap-2">
+                <span>📥</span>
+                <span>Banken importieren</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportBanks}
+                  className="hidden"
+                />
+              </label>
+            </div>
           )}
 
           {/* Add Bank Form */}
@@ -331,7 +329,7 @@ export default function DepotsPage() {
                           </p>
                           <Link
                             href={`/depots/${bank.id}`}
-                            className="inline-block px-4 py-2 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+                            className="inline-block px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
                           >
                             Positionen verwalten →
                           </Link>
