@@ -1,0 +1,625 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { db, Position } from '@/lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+interface StockPrice {
+  currentPrice: number;
+  currency: string;
+  dividendRate?: number;
+  dividendYield?: number;
+  trailingDividendRate?: number;
+  name?: string;
+}
+
+interface HistoricalData {
+  yearStartPrice?: number;
+  previousClose?: number;
+  dividends: Array<{ date: Date; amount: number }>;
+  currentYearDividends: number;
+  nextYearEstimatedDividends?: number;
+}
+
+interface AggregatedAsset {
+  ticker: string;
+  name?: string;
+  totalQuantity: number;
+  totalPurchaseValue: number;
+  totalCurrentValue: number;
+  averagePurchasePrice: number;
+  currentPrice?: number;
+  currency: string;
+  dailyGain?: number;
+  dailyGainPercent?: number;
+  yearlyGain?: number;
+  yearlyGainPercent?: number;
+  currentYearDividends: number;
+  expectedDividends?: number;
+  positions: Position[];
+}
+
+type SortColumn = 'name' | 'value' | 'dailyGain' | 'yearlyGain' | 'currentDividends' | 'expectedDividends';
+type SortDirection = 'asc' | 'desc';
+
+export default function DashboardPage() {
+  const [stockPrices, setStockPrices] = useState<Record<string, StockPrice>>({});
+  const [historicalData, setHistoricalData] = useState<Record<string, HistoricalData>>({});
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [sortColumn, setSortColumn] = useState<SortColumn>('value');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Load all positions from all banks
+  const positions = useLiveQuery(() => db.positions.toArray());
+
+  // Aggregate positions by ticker
+  const aggregatedAssets: AggregatedAsset[] = positions
+    ? Object.values(
+        positions.reduce((acc, position) => {
+          const ticker = position.ticker;
+          if (!acc[ticker]) {
+            acc[ticker] = {
+              ticker,
+              name: undefined,
+              totalQuantity: 0,
+              totalPurchaseValue: 0,
+              totalCurrentValue: 0,
+              averagePurchasePrice: 0,
+              currency: position.currency,
+              currentYearDividends: 0,
+              positions: [],
+            };
+          }
+
+          acc[ticker].totalQuantity += position.quantity;
+          acc[ticker].totalPurchaseValue += position.quantity * position.purchasePrice;
+          acc[ticker].positions.push(position);
+
+          return acc;
+        }, {} as Record<string, AggregatedAsset>)
+      ).map((asset) => {
+        asset.averagePurchasePrice = asset.totalPurchaseValue / asset.totalQuantity;
+
+        const stockPrice = stockPrices[asset.ticker];
+        const historical = historicalData[asset.ticker];
+
+        if (stockPrice) {
+          asset.name = stockPrice.name;
+          asset.currentPrice = stockPrice.currentPrice;
+          asset.totalCurrentValue = asset.totalQuantity * stockPrice.currentPrice;
+
+          // Daily gain/loss
+          if (historical?.previousClose) {
+            asset.dailyGain =
+              asset.totalQuantity * (stockPrice.currentPrice - historical.previousClose);
+            asset.dailyGainPercent =
+              ((stockPrice.currentPrice - historical.previousClose) / historical.previousClose) * 100;
+          }
+
+          // Yearly gain/loss
+          if (historical?.yearStartPrice) {
+            asset.yearlyGain =
+              asset.totalQuantity * (stockPrice.currentPrice - historical.yearStartPrice);
+            asset.yearlyGainPercent =
+              ((stockPrice.currentPrice - historical.yearStartPrice) / historical.yearStartPrice) * 100;
+          }
+        } else {
+          asset.totalCurrentValue = asset.totalPurchaseValue;
+        }
+
+        if (historical) {
+          asset.currentYearDividends = historical.currentYearDividends * asset.totalQuantity;
+          asset.expectedDividends = historical.nextYearEstimatedDividends
+            ? historical.nextYearEstimatedDividends * asset.totalQuantity
+            : undefined;
+        }
+
+        return asset;
+      })
+    : [];
+
+  // Calculate portfolio totals
+  const portfolioTotal = aggregatedAssets.reduce((sum, asset) => sum + asset.totalCurrentValue, 0);
+  const purchaseTotal = aggregatedAssets.reduce((sum, asset) => sum + asset.totalPurchaseValue, 0);
+  const totalGain = portfolioTotal - purchaseTotal;
+  const totalGainPercent = purchaseTotal > 0 ? (totalGain / purchaseTotal) * 100 : 0;
+
+  const totalYearlyGain = aggregatedAssets.reduce((sum, asset) => sum + (asset.yearlyGain || 0), 0);
+  const totalYearlyGainPercent = aggregatedAssets.reduce((sum, asset) => {
+    if (!asset.yearlyGain || !historicalData[asset.ticker]?.yearStartPrice) return sum;
+    const yearStartValue = asset.totalQuantity * historicalData[asset.ticker].yearStartPrice!;
+    return sum + yearStartValue;
+  }, 0);
+  const yearlyGainPercent = totalYearlyGainPercent > 0 ? (totalYearlyGain / totalYearlyGainPercent) * 100 : 0;
+
+  const totalCurrentYearDividends = aggregatedAssets.reduce(
+    (sum, asset) => sum + asset.currentYearDividends,
+    0
+  );
+  const totalExpectedDividends = aggregatedAssets.reduce(
+    (sum, asset) => sum + (asset.expectedDividends || 0),
+    0
+  );
+
+  // Fetch all stock data
+  const handleFetchAllData = async () => {
+    if (!positions || positions.length === 0) return;
+
+    setIsLoadingData(true);
+    const tickers = [...new Set(positions.map((p) => p.ticker))];
+
+    try {
+      const [pricesData, historicalDataArray] = await Promise.all([
+        // Fetch current prices
+        Promise.all(
+          tickers.map(async (ticker) => {
+            try {
+              const response = await fetch(`/api/stock/${ticker}`);
+              if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+              const data = await response.json();
+              return { ticker, data };
+            } catch (error) {
+              console.error(`Failed to fetch price for ${ticker}:`, error);
+              return { ticker, data: null };
+            }
+          })
+        ),
+        // Fetch historical data
+        Promise.all(
+          tickers.map(async (ticker) => {
+            try {
+              const response = await fetch(`/api/stock/${ticker}/history`);
+              if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+              const data = await response.json();
+              return { ticker, data };
+            } catch (error) {
+              console.error(`Failed to fetch historical data for ${ticker}:`, error);
+              return { ticker, data: null };
+            }
+          })
+        ),
+      ]);
+
+      // Update stock prices
+      const newPrices: Record<string, StockPrice> = {};
+      pricesData.forEach(({ ticker, data }) => {
+        if (data) {
+          newPrices[ticker] = data;
+        }
+      });
+      setStockPrices(newPrices);
+
+      // Update historical data
+      const newHistoricalData: Record<string, HistoricalData> = {};
+      historicalDataArray.forEach(({ ticker, data }) => {
+        if (data) {
+          newHistoricalData[ticker] = data;
+        }
+      });
+      setHistoricalData(newHistoricalData);
+    } catch (error) {
+      console.error('Failed to fetch stock data:', error);
+      alert('Fehler beim Laden der Kursdaten');
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  // Auto-fetch on mount
+  useEffect(() => {
+    if (positions && positions.length > 0 && Object.keys(stockPrices).length === 0) {
+      handleFetchAllData();
+    }
+  }, [positions]);
+
+  // Sorting logic
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedAssets = [...aggregatedAssets].sort((a, b) => {
+    let aValue: number | string = 0;
+    let bValue: number | string = 0;
+
+    switch (sortColumn) {
+      case 'name':
+        aValue = a.name || a.ticker;
+        bValue = b.name || b.ticker;
+        break;
+      case 'value':
+        aValue = a.totalCurrentValue;
+        bValue = b.totalCurrentValue;
+        break;
+      case 'dailyGain':
+        aValue = a.dailyGain || 0;
+        bValue = b.dailyGain || 0;
+        break;
+      case 'yearlyGain':
+        aValue = a.yearlyGain || 0;
+        bValue = b.yearlyGain || 0;
+        break;
+      case 'currentDividends':
+        aValue = a.currentYearDividends;
+        bValue = b.currentYearDividends;
+        break;
+      case 'expectedDividends':
+        aValue = a.expectedDividends || 0;
+        bValue = b.expectedDividends || 0;
+        break;
+    }
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortDirection === 'asc'
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue);
+    }
+
+    return sortDirection === 'asc'
+      ? (aValue as number) - (bValue as number)
+      : (bValue as number) - (aValue as number);
+  });
+
+  // Chart data (monthly aggregation for the year)
+  const chartData = (() => {
+    const months = [];
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+
+    for (let month = 0; month <= currentMonth; month++) {
+      months.push({
+        month: new Date(currentYear, month, 1).toLocaleDateString('de-DE', {
+          month: 'short',
+        }),
+        portfolioValue: portfolioTotal / (currentMonth + 1) * (month + 1), // Simplified linear growth
+        purchaseValue: purchaseTotal,
+      });
+    }
+
+    return months;
+  })();
+
+  const formatCurrency = (amount: number, currency: string = 'EUR') => {
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency,
+    }).format(amount);
+  };
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) return <span className="text-zinc-400">⇅</span>;
+    return <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
+      <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-8 flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+              Portfolio Dashboard
+            </h1>
+            <div className="flex gap-3">
+              <button
+                onClick={handleFetchAllData}
+                disabled={isLoadingData}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{isLoadingData ? '⏳' : '🔄'}</span>
+                <span>{isLoadingData ? 'Lädt...' : 'Daten aktualisieren'}</span>
+              </button>
+              <Link
+                href="/depots"
+                className="px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors inline-flex items-center gap-2"
+              >
+                Zu Depots
+              </Link>
+            </div>
+          </div>
+
+          {/* Portfolio Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Gesamtwert</p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                {formatCurrency(portfolioTotal)}
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                Einkauf: {formatCurrency(purchaseTotal)}
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Jahresperformance</p>
+              <p
+                className={`text-2xl font-bold ${
+                  totalYearlyGain >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {totalYearlyGain >= 0 ? '+' : ''}
+                {yearlyGainPercent.toFixed(2)}%
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                {formatCurrency(totalYearlyGain)}
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                Dividenden {new Date().getFullYear()}
+              </p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                {formatCurrency(totalCurrentYearDividends)}
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                Erwartete Dividenden {new Date().getFullYear() + 1}
+              </p>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                {formatCurrency(totalExpectedDividends)}
+              </p>
+            </div>
+          </div>
+
+          {/* Portfolio Chart */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6 mb-8">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+              Portfolio-Entwicklung {new Date().getFullYear()}
+            </h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="month" stroke="#9CA3AF" />
+                <YAxis stroke="#9CA3AF" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1F2937',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#F9FAFB',
+                  }}
+                  formatter={(value: number) => formatCurrency(value)}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="portfolioValue"
+                  stroke="#000000"
+                  strokeWidth={2}
+                  name="Aktueller Wert"
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="purchaseValue"
+                  stroke="#9CA3AF"
+                  strokeWidth={2}
+                  name="Kaufwert"
+                  dot={false}
+                  strokeDasharray="5 5"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Assets Table */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg overflow-hidden mb-8">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+                Alle Assets ({aggregatedAssets.length})
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-zinc-50 dark:bg-zinc-900">
+                  <tr>
+                    <th
+                      className="px-6 py-3 text-left text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => handleSort('name')}
+                    >
+                      Name / Ticker <SortIcon column="name" />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => handleSort('value')}
+                    >
+                      Depotwert <SortIcon column="value" />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => handleSort('dailyGain')}
+                    >
+                      Tages +/- <SortIcon column="dailyGain" />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => handleSort('yearlyGain')}
+                    >
+                      Jahres +/- <SortIcon column="yearlyGain" />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => handleSort('currentDividends')}
+                    >
+                      Div. {new Date().getFullYear()} <SortIcon column="currentDividends" />
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-xs font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={() => handleSort('expectedDividends')}
+                    >
+                      Erw. Div. {new Date().getFullYear() + 1} <SortIcon column="expectedDividends" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
+                  {sortedAssets.map((asset) => (
+                    <tr
+                      key={asset.ticker}
+                      className="hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                            {asset.name || asset.ticker}
+                          </p>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                            {asset.ticker} • {asset.totalQuantity} Stk.
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                          {formatCurrency(asset.totalCurrentValue, asset.currency)}
+                        </p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                          {asset.currentPrice && formatCurrency(asset.currentPrice, asset.currency)}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {asset.dailyGain !== undefined ? (
+                          <>
+                            <p
+                              className={`font-medium ${
+                                asset.dailyGain >= 0
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}
+                            >
+                              {asset.dailyGain >= 0 ? '+' : ''}
+                              {formatCurrency(asset.dailyGain, asset.currency)}
+                            </p>
+                            <p
+                              className={`text-sm ${
+                                asset.dailyGainPercent && asset.dailyGainPercent >= 0
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}
+                            >
+                              {asset.dailyGainPercent && asset.dailyGainPercent >= 0 ? '+' : ''}
+                              {asset.dailyGainPercent?.toFixed(2)}%
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-zinc-400">-</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {asset.yearlyGain !== undefined ? (
+                          <>
+                            <p
+                              className={`font-medium ${
+                                asset.yearlyGain >= 0
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}
+                            >
+                              {asset.yearlyGain >= 0 ? '+' : ''}
+                              {formatCurrency(asset.yearlyGain, asset.currency)}
+                            </p>
+                            <p
+                              className={`text-sm ${
+                                asset.yearlyGainPercent && asset.yearlyGainPercent >= 0
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}
+                            >
+                              {asset.yearlyGainPercent && asset.yearlyGainPercent >= 0 ? '+' : ''}
+                              {asset.yearlyGainPercent?.toFixed(2)}%
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-zinc-400">-</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                          {asset.currentYearDividends > 0
+                            ? formatCurrency(asset.currentYearDividends, asset.currency)
+                            : '-'}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                          {asset.expectedDividends
+                            ? formatCurrency(asset.expectedDividends, asset.currency)
+                            : '-'}
+                        </p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Dividend Calendar */}
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+              Dividendenkalender
+            </h2>
+            <div className="space-y-2">
+              {Object.entries(historicalData).flatMap(([ticker, data]) =>
+                data.dividends
+                  .filter((div) => {
+                    const divDate = new Date(div.date);
+                    const today = new Date();
+                    const futureLimit = new Date();
+                    futureLimit.setMonth(futureLimit.getMonth() + 12);
+                    return divDate >= today && divDate <= futureLimit;
+                  })
+                  .map((div) => ({
+                    ticker,
+                    date: new Date(div.date),
+                    amount: div.amount,
+                    asset: aggregatedAssets.find((a) => a.ticker === ticker),
+                  }))
+              )
+                .sort((a, b) => a.date.getTime() - b.date.getTime())
+                .map((div, index) => (
+                  <div
+                    key={`${div.ticker}-${index}`}
+                    className="flex justify-between items-center p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                        {div.asset?.name || div.ticker}
+                      </p>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {div.date.toLocaleDateString('de-DE')}
+                      </p>
+                    </div>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {formatCurrency(div.amount * (div.asset?.totalQuantity || 0))}
+                    </p>
+                  </div>
+                ))}
+              {Object.keys(historicalData).length === 0 && (
+                <p className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+                  Lade Dividendendaten...
+                </p>
+              )}
+              {Object.keys(historicalData).length > 0 &&
+                Object.values(historicalData).every((d) => d.dividends.length === 0) && (
+                  <p className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+                    Keine anstehenden Dividendenzahlungen
+                  </p>
+                )}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
