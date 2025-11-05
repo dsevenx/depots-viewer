@@ -139,13 +139,21 @@ export default function DepotsPage() {
       <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-              Meine Depots
-            </h1>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Verwalte deine Banken und Broker
-            </p>
+          <div className="mb-8 flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
+                Meine Depots
+              </h1>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Verwalte deine Banken und Broker
+              </p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors inline-flex items-center gap-2"
+            >
+              📊 Zum Dashboard
+            </Link>
           </div>
 
           {/* Action Buttons */}
