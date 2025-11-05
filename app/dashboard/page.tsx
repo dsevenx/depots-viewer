@@ -5,23 +5,7 @@ import Link from 'next/link';
 import { db, Position } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-interface StockPrice {
-  currentPrice: number;
-  currency: string;
-  dividendRate?: number;
-  dividendYield?: number;
-  trailingDividendRate?: number;
-  name?: string;
-}
-
-interface HistoricalData {
-  yearStartPrice?: number;
-  previousClose?: number;
-  dividends: Array<{ date: Date; amount: number }>;
-  currentYearDividends: number;
-  nextYearEstimatedDividends?: number;
-}
+import { useSharedStockData, StockPrice, HistoricalData } from '@/lib/hooks/useSharedStockData';
 
 interface AggregatedAsset {
   ticker: string;
@@ -45,9 +29,7 @@ type SortColumn = 'name' | 'value' | 'dailyGain' | 'yearlyGain' | 'currentDivide
 type SortDirection = 'asc' | 'desc';
 
 export default function DashboardPage() {
-  const [stockPrices, setStockPrices] = useState<Record<string, StockPrice>>({});
-  const [historicalData, setHistoricalData] = useState<Record<string, HistoricalData>>({});
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const { stockPrices, historicalData, isLoadingData, fetchStockData, hasData } = useSharedStockData();
   const [sortColumn, setSortColumn] = useState<SortColumn>('value');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
@@ -145,74 +127,27 @@ export default function DashboardPage() {
 
   // Fetch all stock data
   const handleFetchAllData = async () => {
-    if (!positions || positions.length === 0) return;
+    if (!positions || positions.length === 0) {
+      alert('Keine Positionen vorhanden');
+      return;
+    }
 
-    setIsLoadingData(true);
     const tickers = [...new Set(positions.map((p) => p.ticker))];
 
     try {
-      const [pricesData, historicalDataArray] = await Promise.all([
-        // Fetch current prices
-        Promise.all(
-          tickers.map(async (ticker) => {
-            try {
-              const response = await fetch(`/api/stock/${ticker}`);
-              if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-              const data = await response.json();
-              return { ticker, data };
-            } catch (error) {
-              console.error(`Failed to fetch price for ${ticker}:`, error);
-              return { ticker, data: null };
-            }
-          })
-        ),
-        // Fetch historical data
-        Promise.all(
-          tickers.map(async (ticker) => {
-            try {
-              const response = await fetch(`/api/stock/${ticker}/history`);
-              if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-              const data = await response.json();
-              return { ticker, data };
-            } catch (error) {
-              console.error(`Failed to fetch historical data for ${ticker}:`, error);
-              return { ticker, data: null };
-            }
-          })
-        ),
-      ]);
-
-      // Update stock prices
-      const newPrices: Record<string, StockPrice> = {};
-      pricesData.forEach(({ ticker, data }) => {
-        if (data) {
-          newPrices[ticker] = data;
-        }
-      });
-      setStockPrices(newPrices);
-
-      // Update historical data
-      const newHistoricalData: Record<string, HistoricalData> = {};
-      historicalDataArray.forEach(({ ticker, data }) => {
-        if (data) {
-          newHistoricalData[ticker] = data;
-        }
-      });
-      setHistoricalData(newHistoricalData);
+      await fetchStockData(tickers);
     } catch (error) {
       console.error('Failed to fetch stock data:', error);
       alert('Fehler beim Laden der Kursdaten');
-    } finally {
-      setIsLoadingData(false);
     }
   };
 
-  // Auto-fetch on mount
+  // Auto-fetch on mount if no data
   useEffect(() => {
-    if (positions && positions.length > 0 && Object.keys(stockPrices).length === 0) {
+    if (positions && positions.length > 0 && !hasData) {
       handleFetchAllData();
     }
-  }, [positions]);
+  }, [positions, hasData]);
 
   // Sorting logic
   const handleSort = (column: SortColumn) => {
