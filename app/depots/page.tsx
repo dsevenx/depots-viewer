@@ -155,56 +155,6 @@ export default function DepotsPage() {
     }
   };
 
-  // Calculate portfolio totals
-  const portfolioTotal = positions && hasData
-    ? positions.reduce((sum, p) => {
-        const stockPrice = stockPrices[p.ticker];
-        const currentValue = stockPrice ? p.quantity * stockPrice.currentPrice : p.quantity * p.purchasePrice;
-        return sum + currentValue;
-      }, 0)
-    : 0;
-
-  const purchaseTotal = positions
-    ? positions.reduce((sum, p) => sum + p.quantity * p.purchasePrice, 0)
-    : 0;
-
-  const totalGain = portfolioTotal - purchaseTotal;
-
-  const totalYearlyGain = positions && hasData
-    ? positions.reduce((sum, p) => {
-        const historical = historicalData[p.ticker];
-        if (!historical?.yearStartPrice) return sum;
-        const stockPrice = stockPrices[p.ticker];
-        if (!stockPrice) return sum;
-        return sum + p.quantity * (stockPrice.currentPrice - historical.yearStartPrice);
-      }, 0)
-    : 0;
-
-  const totalYearlyGainPercent = positions && hasData
-    ? (() => {
-        const yearStartTotal = positions.reduce((sum, p) => {
-          const historical = historicalData[p.ticker];
-          if (!historical?.yearStartPrice) return sum;
-          return sum + p.quantity * historical.yearStartPrice;
-        }, 0);
-        return yearStartTotal > 0 ? (totalYearlyGain / yearStartTotal) * 100 : 0;
-      })()
-    : 0;
-
-  const totalCurrentYearDividends = positions && hasData
-    ? positions.reduce((sum, p) => {
-        const historical = historicalData[p.ticker];
-        return sum + (historical?.currentYearDividends || 0) * p.quantity;
-      }, 0)
-    : 0;
-
-  const totalExpectedDividends = positions && hasData
-    ? positions.reduce((sum, p) => {
-        const historical = historicalData[p.ticker];
-        return sum + (historical?.nextYearEstimatedDividends || 0) * p.quantity;
-      }, 0)
-    : 0;
-
   const formatCurrency = (amount: number, currency: string = 'EUR') => {
     return new Intl.NumberFormat('de-DE', {
       style: 'currency',
@@ -280,60 +230,6 @@ export default function DepotsPage() {
             </div>
           )}
 
-          {/* Portfolio Summary */}
-          {positions && positions.length > 0 && hasData && (
-            <div className="mb-6 bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-                Portfolio-Übersicht
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Gesamtwert</p>
-                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {formatCurrency(portfolioTotal)}
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    Einkauf: {formatCurrency(purchaseTotal)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Jahresperformance</p>
-                  <p
-                    className={`text-xl font-bold ${
-                      totalYearlyGain >= 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }`}
-                  >
-                    {totalYearlyGain >= 0 ? '+' : ''}
-                    {totalYearlyGainPercent.toFixed(2)}%
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    {formatCurrency(totalYearlyGain)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
-                    Dividenden {new Date().getFullYear()}
-                  </p>
-                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {formatCurrency(totalCurrentYearDividends)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
-                    Erwartete Dividenden {new Date().getFullYear() + 1}
-                  </p>
-                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-                    {formatCurrency(totalExpectedDividends)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Add Bank Form */}
           {isAddingBank && (
@@ -407,6 +303,22 @@ export default function DepotsPage() {
                 const positionCount = bank.id ? getPositionCount(bank.id) : 0;
                 const isEditing = editingBankId === bank.id;
 
+                // Calculate portfolio stats for this bank
+                const bankPositions = positions?.filter((p) => p.bankId === bank.id) || [];
+                const bankHasData = hasData && bankPositions.length > 0;
+
+                const bankPortfolioTotal = bankHasData
+                  ? bankPositions.reduce((sum, p) => {
+                      const stockPrice = stockPrices[p.ticker];
+                      const currentValue = stockPrice ? p.quantity * stockPrice.currentPrice : p.quantity * p.purchasePrice;
+                      return sum + currentValue;
+                    }, 0)
+                  : 0;
+
+                const bankPurchaseTotal = bankPositions.reduce((sum, p) => sum + p.quantity * p.purchasePrice, 0);
+                const bankTotalGain = bankPortfolioTotal - bankPurchaseTotal;
+                const bankTotalGainPercent = bankPurchaseTotal > 0 ? (bankTotalGain / bankPurchaseTotal) * 100 : 0;
+
                 return (
                   <div
                     key={bank.id}
@@ -463,40 +375,90 @@ export default function DepotsPage() {
                       </form>
                     ) : (
                       // Normal View
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-1">
-                            {bank.name}
-                          </h3>
-                          {bank.notes && (
-                            <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                              {bank.notes}
+                      <div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex-1">
+                            <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 mb-1">
+                              {bank.name}
+                            </h3>
+                            {bank.notes && (
+                              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                                {bank.notes}
+                              </p>
+                            )}
+                            <p className="text-xs text-zinc-500 dark:text-zinc-500">
+                              Erstellt: {new Date(bank.createdAt).toLocaleDateString('de-DE')} • {positionCount} Position{positionCount !== 1 ? 'en' : ''}
                             </p>
-                          )}
-                          <p className="text-xs text-zinc-500 dark:text-zinc-500 mb-3">
-                            Erstellt: {new Date(bank.createdAt).toLocaleDateString('de-DE')} • {positionCount} Position{positionCount !== 1 ? 'en' : ''}
-                          </p>
-                          <Link
-                            href={`/depots/${bank.id}`}
-                            className="inline-block px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
-                          >
-                            Positionen verwalten →
-                          </Link>
+                          </div>
+                          <div className="ml-4 flex gap-2">
+                            <button
+                              onClick={() => handleEditBank(bank)}
+                              className="px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                            >
+                              Bearbeiten
+                            </button>
+                            <button
+                              onClick={() => bank.id && handleDeleteBank(bank.id)}
+                              className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            >
+                              Löschen
+                            </button>
+                          </div>
                         </div>
-                        <div className="ml-4 flex gap-2">
-                          <button
-                            onClick={() => handleEditBank(bank)}
-                            className="px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
-                          >
-                            Bearbeiten
-                          </button>
-                          <button
-                            onClick={() => bank.id && handleDeleteBank(bank.id)}
-                            className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          >
-                            Löschen
-                          </button>
-                        </div>
+
+                        {/* Portfolio Summary for this Bank */}
+                        {bankHasData && (
+                          <div className="mb-4 p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-3">Portfolio-Übersicht</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                              <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Depotwert</p>
+                                <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                                  {formatCurrency(bankPortfolioTotal)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Einkaufswert</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                                  {formatCurrency(bankPurchaseTotal)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Gewinn/Verlust</p>
+                                <p
+                                  className={`text-sm font-bold ${
+                                    bankTotalGain >= 0
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}
+                                >
+                                  {bankTotalGain >= 0 ? '+' : ''}
+                                  {formatCurrency(bankTotalGain)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Performance</p>
+                                <p
+                                  className={`text-sm font-bold ${
+                                    bankTotalGainPercent >= 0
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
+                                  }`}
+                                >
+                                  {bankTotalGainPercent >= 0 ? '+' : ''}
+                                  {bankTotalGainPercent.toFixed(2)}%
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <Link
+                          href={`/depots/${bank.id}`}
+                          className="inline-block px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+                        >
+                          Positionen verwalten →
+                        </Link>
                       </div>
                     )}
                   </div>

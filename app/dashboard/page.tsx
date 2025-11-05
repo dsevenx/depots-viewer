@@ -201,24 +201,46 @@ export default function DashboardPage() {
       : (bValue as number) - (aValue as number);
   });
 
-  // Chart data (monthly aggregation for the year)
+  // Chart data (step-wise based on actual purchases)
   const chartData = (() => {
-    const months = [];
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
+    if (!positions || positions.length === 0) return [];
 
-    for (let month = 0; month <= currentMonth; month++) {
-      months.push({
-        month: new Date(currentYear, month, 1).toLocaleDateString('de-DE', {
+    // Sort all positions by purchase date
+    const sortedPositions = [...positions].sort((a, b) => {
+      const dateA = new Date(a.purchaseDate).getTime();
+      const dateB = new Date(b.purchaseDate).getTime();
+      return dateA - dateB;
+    });
+
+    const dataPoints = [];
+    let cumulativePurchaseValue = 0;
+    let cumulativeCurrentValue = 0;
+
+    // Add data point for each purchase
+    sortedPositions.forEach((position, index) => {
+      const purchaseValue = position.quantity * position.purchasePrice;
+      cumulativePurchaseValue += purchaseValue;
+
+      // Calculate current value for this position
+      const stockPrice = stockPrices[position.ticker];
+      const currentValue = stockPrice
+        ? position.quantity * stockPrice.currentPrice
+        : purchaseValue;
+      cumulativeCurrentValue += currentValue;
+
+      dataPoints.push({
+        date: new Date(position.purchaseDate).toLocaleDateString('de-DE', {
+          year: '2-digit',
           month: 'short',
+          day: 'numeric',
         }),
-        portfolioValue: portfolioTotal / (currentMonth + 1) * (month + 1), // Simplified linear growth
-        purchaseValue: purchaseTotal,
+        portfolioValue: cumulativeCurrentValue,
+        purchaseValue: cumulativePurchaseValue,
+        label: `${position.ticker} (${position.quantity})`,
       });
-    }
+    });
 
-    return months;
+    return dataPoints;
   })();
 
   const formatCurrency = (amount: number, currency: string = 'EUR') => {
@@ -311,42 +333,56 @@ export default function DashboardPage() {
           {/* Portfolio Chart */}
           <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6 mb-8">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              Portfolio-Entwicklung {new Date().getFullYear()}
+              Portfolio-Entwicklung
             </h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="month" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1F2937',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#F9FAFB',
-                  }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="portfolioValue"
-                  stroke="#000000"
-                  strokeWidth={2}
-                  name="Aktueller Wert"
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="purchaseValue"
-                  stroke="#9CA3AF"
-                  strokeWidth={2}
-                  name="Kaufwert"
-                  dot={false}
-                  strokeDasharray="5 5"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#9CA3AF"
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <YAxis stroke="#9CA3AF" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1F2937',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#F9FAFB',
+                    }}
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelFormatter={(label) => `Kauf: ${label}`}
+                  />
+                  <Legend />
+                  <Line
+                    type="stepAfter"
+                    dataKey="portfolioValue"
+                    stroke="#000000"
+                    strokeWidth={2}
+                    name="Aktueller Wert"
+                    dot={{ r: 3 }}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="purchaseValue"
+                    stroke="#9CA3AF"
+                    strokeWidth={2}
+                    name="Kaufwert"
+                    dot={{ r: 3 }}
+                    strokeDasharray="5 5"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-center text-zinc-500 dark:text-zinc-400 py-8">
+                Keine Positionen vorhanden. Füge Positionen hinzu, um die Portfolio-Entwicklung zu sehen.
+              </p>
+            )}
           </div>
 
           {/* Assets Table */}
