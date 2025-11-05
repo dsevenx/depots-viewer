@@ -11,6 +11,7 @@ import {
   parseBankCSV,
 } from '@/lib/csv-banks';
 import { readFile } from '@/lib/csv-utils';
+import { useSharedStockData } from '@/lib/hooks/useSharedStockData';
 
 export default function DepotsPage() {
   const router = useRouter();
@@ -25,6 +26,9 @@ export default function DepotsPage() {
   // Live query - updates automatically when data changes
   const banks = useLiveQuery(() => db.banks.toArray());
   const positions = useLiveQuery(() => db.positions.toArray());
+
+  // Shared stock data
+  const { stockPrices, historicalData, isLoadingData, fetchStockData, hasData } = useSharedStockData();
 
   // Count positions per bank
   const getPositionCount = (bankId: number) => {
@@ -134,6 +138,80 @@ export default function DepotsPage() {
     }
   };
 
+  // Stock Price Handlers
+  const handleFetchAllPrices = async () => {
+    if (!positions || positions.length === 0) {
+      alert('Keine Positionen zum Aktualisieren vorhanden');
+      return;
+    }
+
+    const tickers = [...new Set(positions.map((p) => p.ticker))];
+
+    try {
+      await fetchStockData(tickers);
+    } catch (error) {
+      console.error('Failed to fetch stock data:', error);
+      alert('Fehler beim Laden der Kursdaten');
+    }
+  };
+
+  // Calculate portfolio totals
+  const portfolioTotal = positions && hasData
+    ? positions.reduce((sum, p) => {
+        const stockPrice = stockPrices[p.ticker];
+        const currentValue = stockPrice ? p.quantity * stockPrice.currentPrice : p.quantity * p.purchasePrice;
+        return sum + currentValue;
+      }, 0)
+    : 0;
+
+  const purchaseTotal = positions
+    ? positions.reduce((sum, p) => sum + p.quantity * p.purchasePrice, 0)
+    : 0;
+
+  const totalGain = portfolioTotal - purchaseTotal;
+
+  const totalYearlyGain = positions && hasData
+    ? positions.reduce((sum, p) => {
+        const historical = historicalData[p.ticker];
+        if (!historical?.yearStartPrice) return sum;
+        const stockPrice = stockPrices[p.ticker];
+        if (!stockPrice) return sum;
+        return sum + p.quantity * (stockPrice.currentPrice - historical.yearStartPrice);
+      }, 0)
+    : 0;
+
+  const totalYearlyGainPercent = positions && hasData
+    ? (() => {
+        const yearStartTotal = positions.reduce((sum, p) => {
+          const historical = historicalData[p.ticker];
+          if (!historical?.yearStartPrice) return sum;
+          return sum + p.quantity * historical.yearStartPrice;
+        }, 0);
+        return yearStartTotal > 0 ? (totalYearlyGain / yearStartTotal) * 100 : 0;
+      })()
+    : 0;
+
+  const totalCurrentYearDividends = positions && hasData
+    ? positions.reduce((sum, p) => {
+        const historical = historicalData[p.ticker];
+        return sum + (historical?.currentYearDividends || 0) * p.quantity;
+      }, 0)
+    : 0;
+
+  const totalExpectedDividends = positions && hasData
+    ? positions.reduce((sum, p) => {
+        const historical = historicalData[p.ticker];
+        return sum + (historical?.nextYearEstimatedDividends || 0) * p.quantity;
+      }, 0)
+    : 0;
+
+  const formatCurrency = (amount: number, currency: string = 'EUR') => {
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency',
+      currency,
+    }).format(amount);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-black">
       <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
@@ -167,6 +245,14 @@ export default function DepotsPage() {
                 <span>Bank hinzufügen</span>
               </button>
               <button
+                onClick={handleFetchAllPrices}
+                disabled={isLoadingData || !positions || positions.length === 0}
+                className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span>{isLoadingData ? '⏳' : '📈'}</span>
+                <span>{isLoadingData ? 'Lädt...' : 'Kurse aktualisieren'}</span>
+              </button>
+              <button
                 onClick={downloadExampleBankCSV}
                 className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2"
               >
@@ -191,6 +277,61 @@ export default function DepotsPage() {
                   className="hidden"
                 />
               </label>
+            </div>
+          )}
+
+          {/* Portfolio Summary */}
+          {positions && positions.length > 0 && hasData && (
+            <div className="mb-6 bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+                Portfolio-Übersicht
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Gesamtwert</p>
+                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {formatCurrency(portfolioTotal)}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    Einkauf: {formatCurrency(purchaseTotal)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Jahresperformance</p>
+                  <p
+                    className={`text-xl font-bold ${
+                      totalYearlyGain >= 0
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}
+                  >
+                    {totalYearlyGain >= 0 ? '+' : ''}
+                    {totalYearlyGainPercent.toFixed(2)}%
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    {formatCurrency(totalYearlyGain)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                    Dividenden {new Date().getFullYear()}
+                  </p>
+                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {formatCurrency(totalCurrentYearDividends)}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                    Erwartete Dividenden {new Date().getFullYear() + 1}
+                  </p>
+                  <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    {formatCurrency(totalExpectedDividends)}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

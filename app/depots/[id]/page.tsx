@@ -12,6 +12,7 @@ import {
 } from '@/lib/csv-positions';
 import { readFile } from '@/lib/csv-utils';
 import { DropdownDepotViewer } from '@/app/components/DropdownDepotViewer';
+import { useSharedStockData } from '@/lib/hooks/useSharedStockData';
 
 export default function BankDetailPage() {
   const params = useParams();
@@ -42,18 +43,8 @@ export default function BankDetailPage() {
     notes: '',
   });
 
-  // Stock prices state
-  interface StockPrice {
-    currentPrice: number;
-    currency: string;
-    dividendRate?: number;
-    dividendYield?: number;
-    trailingDividendRate?: number;
-    name?: string;
-  }
-
-  const [stockPrices, setStockPrices] = useState<Record<string, StockPrice>>({});
-  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  // Shared stock data
+  const { stockPrices, historicalData, isLoadingData, fetchStockData, hasData } = useSharedStockData();
 
   // Live queries
   const bank = useLiveQuery(() => db.banks.get(bankId));
@@ -253,49 +244,13 @@ export default function BankDetailPage() {
       return;
     }
 
-    setIsLoadingPrices(true);
-    const newPrices: Record<string, StockPrice> = {};
-    const errors: string[] = [];
+    const tickers = [...new Set(positions.map((p) => p.ticker))];
 
     try {
-      // Fetch prices for all positions
-      await Promise.all(
-        positions.map(async (position) => {
-          try {
-            const response = await fetch(`/api/stock/${position.ticker}`);
-            if (!response.ok) {
-              errors.push(position.ticker);
-            } else {
-              const data = await response.json();
-              newPrices[position.ticker] = {
-                currentPrice: data.currentPrice,
-                currency: data.currency,
-                dividendRate: data.dividendRate,
-                dividendYield: data.dividendYield,
-                trailingDividendRate: data.trailingDividendRate,
-                name: data.name,
-              };
-            }
-
-          } catch (error) {
-            console.error(`Failed to fetch price for ${position.ticker}:`, error);
-            errors.push(position.ticker);
-          }
-        })
-      );
-
-      setStockPrices(newPrices);
-
-      if (errors.length > 0) {
-        alert(
-          `Kurse aktualisiert. Folgende Ticker konnten nicht geladen werden: ${errors.join(', ')}`
-        );
-      }
+      await fetchStockData(tickers);
     } catch (error) {
-      console.error('Failed to fetch prices:', error);
-      alert('Fehler beim Aktualisieren der Kurse');
-    } finally {
-      setIsLoadingPrices(false);
+      console.error('Failed to fetch stock data:', error);
+      alert('Fehler beim Laden der Kursdaten');
     }
   };
 
@@ -347,11 +302,11 @@ export default function BankDetailPage() {
               </button>
               <button
                 onClick={handleFetchPrices}
-                disabled={isLoadingPrices || !positions || positions.length === 0}
+                disabled={isLoadingData || !positions || positions.length === 0}
                 className="px-4 py-2.5 bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-700 dark:hover:bg-zinc-200 transition-colors text-sm inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>{isLoadingPrices ? '⏳' : '📈'}</span>
-                <span>{isLoadingPrices ? 'Lädt...' : 'Kurse aktualisieren'}</span>
+                <span>{isLoadingData ? '⏳' : '📈'}</span>
+                <span>{isLoadingData ? 'Lädt...' : 'Kurse aktualisieren'}</span>
               </button>
               <button
                 onClick={downloadExamplePositionCSV}
