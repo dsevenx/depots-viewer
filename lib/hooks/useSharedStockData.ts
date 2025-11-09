@@ -6,6 +6,7 @@ export interface StockPrice {
   dividendRate?: number;
   dividendYield?: number;
   trailingDividendRate?: number;
+  trailingDividendYield?: number;
   name?: string;
 }
 
