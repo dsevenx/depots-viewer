@@ -36,6 +36,16 @@ export default function DashboardPage() {
   // Load all positions from all banks
   const positions = useLiveQuery(() => db.positions.toArray());
 
+  // Log loaded data
+  useEffect(() => {
+    if (Object.keys(historicalData).length > 0) {
+      console.log('[Dashboard] Historical data loaded:', {
+        tickersWithData: Object.keys(historicalData),
+        data: historicalData,
+      });
+    }
+  }, [historicalData]);
+
   // Aggregate positions by ticker
   const aggregatedAssets: AggregatedAsset[] = positions
     ? Object.values(
@@ -86,6 +96,14 @@ export default function DashboardPage() {
               asset.totalQuantity * (stockPrice.currentPrice - historical.yearStartPrice);
             asset.yearlyGainPercent =
               ((stockPrice.currentPrice - historical.yearStartPrice) / historical.yearStartPrice) * 100;
+            console.log(`[Dashboard] ${ticker} yearly performance:`, {
+              yearStartPrice: historical.yearStartPrice,
+              currentPrice: stockPrice.currentPrice,
+              yearlyGain: asset.yearlyGain,
+              yearlyGainPercent: asset.yearlyGainPercent,
+            });
+          } else {
+            console.log(`[Dashboard] ${ticker}: No yearStartPrice available for yearly performance`);
           }
         } else {
           asset.totalCurrentValue = asset.totalPurchaseValue;
@@ -96,6 +114,15 @@ export default function DashboardPage() {
           asset.expectedDividends = historical.nextYearEstimatedDividends
             ? historical.nextYearEstimatedDividends * asset.totalQuantity
             : undefined;
+          console.log(`[Dashboard] ${ticker} dividends:`, {
+            currentYearDividends: historical.currentYearDividends,
+            totalQuantity: asset.totalQuantity,
+            totalCurrentYearDiv: asset.currentYearDividends,
+            nextYearEstimated: historical.nextYearEstimatedDividends,
+            totalExpectedDiv: asset.expectedDividends,
+          });
+        } else {
+          console.log(`[Dashboard] ${ticker}: No historical data available for dividends`);
         }
 
         return asset;
