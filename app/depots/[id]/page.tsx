@@ -278,16 +278,26 @@ export default function BankDetailPage() {
           <div className="mb-8">
             <Link
               href="/depots"
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors mb-2"
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors mb-4"
             >
               ← Zurück zur Übersicht
             </Link>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-              {bank.name}
-            </h1>
-            {bank.notes && (
-              <p className="text-zinc-600 dark:text-zinc-400">{bank.notes}</p>
-            )}
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
+                  {bank.name}
+                </h1>
+                {bank.notes && (
+                  <p className="text-zinc-600 dark:text-zinc-400">{bank.notes}</p>
+                )}
+              </div>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors inline-flex items-center gap-2"
+              >
+                📊 Zum Dashboard
+              </Link>
+            </div>
           </div>
 
           {/* Action Buttons */}
