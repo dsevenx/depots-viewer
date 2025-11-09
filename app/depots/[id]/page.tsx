@@ -740,7 +740,7 @@ export default function BankDetailPage() {
                           {/* Current Price Info */}
                           {stockPrice && (
                             <div className="mb-3 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm mb-3">
                                 <div>
                                   <p className="text-zinc-500 dark:text-zinc-500">Aktueller Kurs</p>
                                   <p className="font-medium text-zinc-900 dark:text-zinc-50">
@@ -762,20 +762,54 @@ export default function BankDetailPage() {
                                     {gain && formatCurrency(gain, position.currency)}
                                   </p>
                                 </div>
-                                {stockPrice.dividendRate && (
-                                  <div>
-                                    <p className="text-zinc-500 dark:text-zinc-500">Div. (geschätzt)</p>
-                                    <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                                      {formatCurrency(stockPrice.dividendRate, stockPrice.currency)}
-                                      {stockPrice.dividendYield && (
-                                        <span className="text-xs text-zinc-500 ml-1">
-                                          ({(stockPrice.dividendYield * 100).toFixed(2)}%)
-                                        </span>
-                                      )}
-                                    </p>
-                                  </div>
-                                )}
                               </div>
+                              {/* Dividends Section */}
+                              {(stockPrice.trailingDividendRate || stockPrice.dividendRate) && (
+                                <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                    {/* Trailing (Current) Dividend */}
+                                    {stockPrice.trailingDividendRate && (
+                                      <>
+                                        <div>
+                                          <p className="text-zinc-500 dark:text-zinc-500">Akt. Div.</p>
+                                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                            {formatCurrency(stockPrice.trailingDividendRate, stockPrice.currency)}
+                                            <span className="text-xs text-zinc-500 ml-1">
+                                              ({((stockPrice.trailingDividendRate / stockPrice.currentPrice) * 100).toFixed(2)}%)
+                                            </span>
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-zinc-500 dark:text-zinc-500">Akt. Div. Gesamt</p>
+                                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                            {formatCurrency(stockPrice.trailingDividendRate * position.quantity, stockPrice.currency)}
+                                          </p>
+                                        </div>
+                                      </>
+                                    )}
+                                    {/* Forward (Estimated) Dividend */}
+                                    {stockPrice.dividendRate && (
+                                      <>
+                                        <div>
+                                          <p className="text-zinc-500 dark:text-zinc-500">Zuk. Div.</p>
+                                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                            {formatCurrency(stockPrice.dividendRate, stockPrice.currency)}
+                                            <span className="text-xs text-zinc-500 ml-1">
+                                              ({((stockPrice.dividendRate / stockPrice.currentPrice) * 100).toFixed(2)}%)
+                                            </span>
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-zinc-500 dark:text-zinc-500">Zuk. Div. Gesamt</p>
+                                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                            {formatCurrency(stockPrice.dividendRate * position.quantity, stockPrice.currency)}
+                                          </p>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
