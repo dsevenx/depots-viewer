@@ -145,17 +145,101 @@ export default function DashboardPage() {
   // Calculate portfolio totals
   const portfolioTotal = aggregatedAssets.reduce((sum, asset) => sum + asset.totalCurrentValue, 0);
   const purchaseTotal = aggregatedAssets.reduce((sum, asset) => sum + asset.totalPurchaseValue, 0);
+
+  // 1. Akkumulierte Performance (absolut)
   const totalGain = portfolioTotal - purchaseTotal;
   const totalGainPercent = purchaseTotal > 0 ? (totalGain / purchaseTotal) * 100 : 0;
 
-  const totalYearlyGain = aggregatedAssets.reduce((sum, asset) => sum + (asset.yearlyGain || 0), 0);
-  const totalYearlyGainPercent = aggregatedAssets.reduce((sum, asset) => {
-    if (!asset.yearlyGain || !historicalData[asset.ticker]?.yearStartPrice) return sum;
-    const yearStartValue = asset.totalQuantity * historicalData[asset.ticker].yearStartPrice!;
-    return sum + yearStartValue;
-  }, 0);
-  const yearlyGainPercent = totalYearlyGainPercent > 0 ? (totalYearlyGain / totalYearlyGainPercent) * 100 : 0;
+  // 2. Akkumulierte Performance (% p.a.) - annualisiert vom ersten Kaufdatum
+  const calculateAnnualizedReturn = () => {
+    if (!positions || positions.length === 0 || purchaseTotal === 0) return 0;
 
+    // Finde das früheste Kaufdatum
+    const firstPurchaseDate = positions.reduce((earliest, position) => {
+      const purchaseDate = new Date(position.purchaseDate);
+      return purchaseDate < earliest ? purchaseDate : earliest;
+    }, new Date(positions[0].purchaseDate));
+
+    // Berechne die Anzahl der Jahre seit dem ersten Kauf
+    const today = new Date();
+    const yearsHeld = (today.getTime() - firstPurchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+
+    if (yearsHeld < 0.01) return 0; // Zu kurze Zeitspanne
+
+    // Annualisierte Rendite: ((EndValue / StartValue) ^ (1 / Jahre) - 1) * 100
+    const annualizedReturn = (Math.pow(portfolioTotal / purchaseTotal, 1 / yearsHeld) - 1) * 100;
+
+    console.log('[Dashboard] Annualized return:', {
+      firstPurchaseDate: firstPurchaseDate.toISOString(),
+      yearsHeld,
+      purchaseTotal,
+      portfolioTotal,
+      annualizedReturn,
+    });
+
+    return annualizedReturn;
+  };
+
+  const annualizedReturnPercent = calculateAnnualizedReturn();
+
+  // 3 & 4. Jahresperformance 2025
+  const calculateYearToDatePerformance = () => {
+    if (!positions || positions.length === 0) {
+      return { ytdGain: 0, ytdGainPercent: 0, yearStartValue: 0 };
+    }
+
+    const currentYear = new Date().getFullYear();
+    const yearStartDate = new Date(currentYear, 0, 1);
+
+    // Berechne den Depotwert am 1. Januar 2025
+    let yearStartValue = 0;
+
+    positions.forEach((position) => {
+      const purchaseDate = new Date(position.purchaseDate);
+
+      // Position muss vor dem 1.1. gekauft worden sein
+      if (purchaseDate < yearStartDate) {
+        const historical = historicalData[position.ticker];
+
+        if (historical?.yearStartPrice) {
+          // Wert dieser Position am 1.1.
+          yearStartValue += position.quantity * historical.yearStartPrice;
+        }
+      }
+    });
+
+    // Nur Positionen berücksichtigen, die am 1.1. bereits im Depot waren
+    // Für den aktuellen Wert zählen wir nur die Positionen, die am 1.1. schon da waren
+    let currentValueOfYearStartPositions = 0;
+
+    positions.forEach((position) => {
+      const purchaseDate = new Date(position.purchaseDate);
+
+      if (purchaseDate < yearStartDate) {
+        const stockPrice = stockPrices[position.ticker];
+
+        if (stockPrice) {
+          currentValueOfYearStartPositions += position.quantity * stockPrice.currentPrice;
+        }
+      }
+    });
+
+    const ytdGain = currentValueOfYearStartPositions - yearStartValue;
+    const ytdGainPercent = yearStartValue > 0 ? (ytdGain / yearStartValue) * 100 : 0;
+
+    console.log('[Dashboard] YTD Performance:', {
+      yearStartValue,
+      currentValueOfYearStartPositions,
+      ytdGain,
+      ytdGainPercent,
+    });
+
+    return { ytdGain, ytdGainPercent, yearStartValue };
+  };
+
+  const { ytdGain, ytdGainPercent, yearStartValue } = calculateYearToDatePerformance();
+
+  // Dividends totals
   const totalCurrentYearDividends = aggregatedAssets.reduce(
     (sum, asset) => sum + asset.currentYearDividends,
     0
@@ -323,7 +407,8 @@ export default function DashboardPage() {
           </div>
 
           {/* Portfolio Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* Erste Reihe: Performance-Metriken */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Gesamtwert</p>
               <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -335,19 +420,78 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Jahresperformance</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Akk. Performance</p>
               <p
                 className={`text-2xl font-bold ${
-                  totalYearlyGain >= 0
+                  totalGain >= 0
                     ? 'text-green-600 dark:text-green-400'
                     : 'text-red-600 dark:text-red-400'
                 }`}
               >
-                {totalYearlyGain >= 0 ? '+' : ''}
-                {yearlyGainPercent.toFixed(2)}%
+                {totalGain >= 0 ? '+' : ''}
+                {formatCurrency(totalGain)}
               </p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                {formatCurrency(totalYearlyGain)}
+                {totalGainPercent >= 0 ? '+' : ''}
+                {totalGainPercent.toFixed(2)}%
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">Akk. Perf. p.a.</p>
+              <p
+                className={`text-2xl font-bold ${
+                  annualizedReturnPercent >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {annualizedReturnPercent >= 0 ? '+' : ''}
+                {annualizedReturnPercent.toFixed(2)}%
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                annualisiert
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                Perf. {new Date().getFullYear()}
+              </p>
+              <p
+                className={`text-2xl font-bold ${
+                  ytdGain >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {ytdGain >= 0 ? '+' : ''}
+                {formatCurrency(ytdGain)}
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                1.1.: {formatCurrency(yearStartValue)}
+              </p>
+            </div>
+          </div>
+
+          {/* Zweite Reihe: Jahresperformance % + Dividenden */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                Perf. {new Date().getFullYear()} %
+              </p>
+              <p
+                className={`text-2xl font-bold ${
+                  ytdGainPercent >= 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {ytdGainPercent >= 0 ? '+' : ''}
+                {ytdGainPercent.toFixed(2)}%
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                seit 1.1.{new Date().getFullYear()}
               </p>
             </div>
 
@@ -358,14 +502,20 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                 {formatCurrency(totalCurrentYearDividends)}
               </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                aktuell/trailing
+              </p>
             </div>
 
             <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-lg p-6">
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
-                Erwartete Dividenden {new Date().getFullYear() + 1}
+                Div. Erw. {new Date().getFullYear() + 1}
               </p>
               <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                 {formatCurrency(totalExpectedDividends)}
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                forward/geschätzt
               </p>
             </div>
           </div>
