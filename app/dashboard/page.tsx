@@ -36,15 +36,30 @@ export default function DashboardPage() {
   // Load all positions from all banks
   const positions = useLiveQuery(() => db.positions.toArray());
 
-  // Log loaded data
-  useEffect(() => {
-    if (Object.keys(historicalData).length > 0) {
-      console.log('[Dashboard] Historical data loaded:', {
-        tickersWithData: Object.keys(historicalData),
-        data: historicalData,
-      });
+  // Calculate yearly performance for a specific asset
+  const calculateYearlyPerformance = (
+    ticker: string,
+    currentPrice: number,
+    totalQuantity: number
+  ): { yearlyGain?: number; yearlyGainPercent?: number } => {
+    const historical = historicalData[ticker];
+    if (!historical?.yearStartPrice) {
+      return {};
     }
-  }, [historicalData]);
+
+    const yearlyGain = totalQuantity * (currentPrice - historical.yearStartPrice);
+    const yearlyGainPercent =
+      ((currentPrice - historical.yearStartPrice) / historical.yearStartPrice) * 100;
+
+    console.log(`[Dashboard] ${ticker} yearly performance:`, {
+      yearStartPrice: historical.yearStartPrice,
+      currentPrice,
+      yearlyGain,
+      yearlyGainPercent,
+    });
+
+    return { yearlyGain, yearlyGainPercent };
+  };
 
   // Aggregate positions by ticker
   const aggregatedAssets: AggregatedAsset[] = positions
@@ -72,10 +87,11 @@ export default function DashboardPage() {
           return acc;
         }, {} as Record<string, AggregatedAsset>)
       ).map((asset) => {
+        const ticker = asset.ticker;
         asset.averagePurchasePrice = asset.totalPurchaseValue / asset.totalQuantity;
 
-        const stockPrice = stockPrices[asset.ticker];
-        const historical = historicalData[asset.ticker];
+        const stockPrice = stockPrices[ticker];
+        const historical = historicalData[ticker];
 
         if (stockPrice) {
           asset.name = stockPrice.name;
@@ -90,39 +106,36 @@ export default function DashboardPage() {
               ((stockPrice.currentPrice - historical.previousClose) / historical.previousClose) * 100;
           }
 
-          // Yearly gain/loss
-          if (historical?.yearStartPrice) {
-            asset.yearlyGain =
-              asset.totalQuantity * (stockPrice.currentPrice - historical.yearStartPrice);
-            asset.yearlyGainPercent =
-              ((stockPrice.currentPrice - historical.yearStartPrice) / historical.yearStartPrice) * 100;
-            console.log(`[Dashboard] ${ticker} yearly performance:`, {
-              yearStartPrice: historical.yearStartPrice,
-              currentPrice: stockPrice.currentPrice,
-              yearlyGain: asset.yearlyGain,
-              yearlyGainPercent: asset.yearlyGainPercent,
+          // Yearly gain/loss - using separate method
+          const yearlyPerf = calculateYearlyPerformance(
+            ticker,
+            stockPrice.currentPrice,
+            asset.totalQuantity
+          );
+          asset.yearlyGain = yearlyPerf.yearlyGain;
+          asset.yearlyGainPercent = yearlyPerf.yearlyGainPercent;
+
+          // Dividends - simplified using stockPrices directly
+          if (stockPrice.trailingDividendRate) {
+            asset.currentYearDividends = stockPrice.trailingDividendRate * asset.totalQuantity;
+            console.log(`[Dashboard] ${ticker} current dividends (trailing):`, {
+              trailingDividendRate: stockPrice.trailingDividendRate,
+              totalQuantity: asset.totalQuantity,
+              totalCurrentYearDiv: asset.currentYearDividends,
             });
-          } else {
-            console.log(`[Dashboard] ${ticker}: No yearStartPrice available for yearly performance`);
+          }
+
+          if (stockPrice.dividendRate) {
+            asset.expectedDividends = stockPrice.dividendRate * asset.totalQuantity;
+            console.log(`[Dashboard] ${ticker} expected dividends (forward):`, {
+              dividendRate: stockPrice.dividendRate,
+              totalQuantity: asset.totalQuantity,
+              totalExpectedDiv: asset.expectedDividends,
+            });
           }
         } else {
           asset.totalCurrentValue = asset.totalPurchaseValue;
-        }
-
-        if (historical) {
-          asset.currentYearDividends = historical.currentYearDividends * asset.totalQuantity;
-          asset.expectedDividends = historical.nextYearEstimatedDividends
-            ? historical.nextYearEstimatedDividends * asset.totalQuantity
-            : undefined;
-          console.log(`[Dashboard] ${ticker} dividends:`, {
-            currentYearDividends: historical.currentYearDividends,
-            totalQuantity: asset.totalQuantity,
-            totalCurrentYearDiv: asset.currentYearDividends,
-            nextYearEstimated: historical.nextYearEstimatedDividends,
-            totalExpectedDiv: asset.expectedDividends,
-          });
-        } else {
-          console.log(`[Dashboard] ${ticker}: No historical data available for dividends`);
+          console.log(`[Dashboard] ${ticker}: No stock price data available`);
         }
 
         return asset;
