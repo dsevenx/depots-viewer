@@ -35,6 +35,7 @@ export default function DashboardPage() {
 
   // Load all positions from all banks
   const positions = useLiveQuery(() => db.positions.toArray());
+  const banks = useLiveQuery(() => db.banks.toArray());
 
   // Calculate yearly performance for a specific asset
   const calculateYearlyPerformance = (
@@ -327,40 +328,68 @@ export default function DashboardPage() {
 
   // Chart data (step-wise based on actual purchases)
   const chartData = (() => {
-    if (!positions || positions.length === 0) return [];
+    if (!positions || positions.length === 0 || !banks) return [];
 
-    // Sort all positions by purchase date
-    const sortedPositions = [...positions].sort((a, b) => {
-      const dateA = new Date(a.purchaseDate).getTime();
-      const dateB = new Date(b.purchaseDate).getTime();
-      return dateA - dateB;
+    // Create a map for quick bank lookup
+    const bankMap = new Map(banks.map(bank => [bank.id, bank.name]));
+
+    // Group positions by date
+    const positionsByDate = new Map<string, Position[]>();
+    positions.forEach((position) => {
+      const dateKey = new Date(position.purchaseDate).toISOString().split('T')[0];
+      if (!positionsByDate.has(dateKey)) {
+        positionsByDate.set(dateKey, []);
+      }
+      positionsByDate.get(dateKey)!.push(position);
     });
+
+    // Sort dates
+    const sortedDates = Array.from(positionsByDate.keys()).sort();
 
     const dataPoints = [];
     let cumulativePurchaseValue = 0;
     let cumulativeCurrentValue = 0;
 
-    // Add data point for each purchase
-    sortedPositions.forEach((position, index) => {
-      const purchaseValue = position.quantity * position.purchasePrice;
-      cumulativePurchaseValue += purchaseValue;
+    // Add data point for each date (potentially multiple positions)
+    sortedDates.forEach((dateKey) => {
+      const positionsOnDate = positionsByDate.get(dateKey)!;
 
-      // Calculate current value for this position
-      const stockPrice = stockPrices[position.ticker];
-      const currentValue = stockPrice
-        ? position.quantity * stockPrice.currentPrice
-        : purchaseValue;
-      cumulativeCurrentValue += currentValue;
+      // Calculate values for all positions on this date
+      let datePurchaseValue = 0;
+      let dateCurrentValue = 0;
+
+      const positionDetails = positionsOnDate.map((position) => {
+        const purchaseValue = position.quantity * position.purchasePrice;
+        datePurchaseValue += purchaseValue;
+
+        const stockPrice = stockPrices[position.ticker];
+        const currentValue = stockPrice
+          ? position.quantity * stockPrice.currentPrice
+          : purchaseValue;
+        dateCurrentValue += currentValue;
+
+        return {
+          ticker: position.ticker,
+          quantity: position.quantity,
+          bankName: bankMap.get(position.bankId) || 'Unbekanntes Depot',
+          purchaseValue,
+          currentValue,
+        };
+      });
+
+      cumulativePurchaseValue += datePurchaseValue;
+      cumulativeCurrentValue += dateCurrentValue;
 
       dataPoints.push({
-        date: new Date(position.purchaseDate).toLocaleDateString('de-DE', {
+        date: new Date(dateKey).toLocaleDateString('de-DE', {
           year: '2-digit',
           month: 'short',
           day: 'numeric',
         }),
+        fullDate: new Date(dateKey).toLocaleDateString('de-DE'),
         portfolioValue: cumulativeCurrentValue,
         purchaseValue: cumulativePurchaseValue,
-        label: `${position.ticker} (${position.quantity})`,
+        positions: positionDetails,
       });
     });
 
@@ -377,6 +406,63 @@ export default function DashboardPage() {
   const SortIcon = ({ column }: { column: SortColumn }) => {
     if (sortColumn !== column) return <span className="text-zinc-400">⇅</span>;
     return <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>;
+  };
+
+  // Custom Tooltip for Chart
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+
+    const data = payload[0].payload;
+
+    return (
+      <div className="bg-zinc-800 dark:bg-zinc-900 border border-zinc-700 rounded-lg p-4 shadow-xl">
+        <p className="text-zinc-100 font-semibold mb-3 text-sm border-b border-zinc-700 pb-2">
+          {data.fullDate}
+        </p>
+
+        {/* Portfolio Values */}
+        <div className="mb-3 space-y-1">
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-zinc-400 text-xs">Aktueller Wert:</span>
+            <span className="text-zinc-100 font-semibold text-sm">
+              {formatCurrency(data.portfolioValue)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-zinc-400 text-xs">Kaufwert:</span>
+            <span className="text-zinc-400 text-sm">
+              {formatCurrency(data.purchaseValue)}
+            </span>
+          </div>
+        </div>
+
+        {/* Positions bought on this date */}
+        {data.positions && data.positions.length > 0 && (
+          <div className="border-t border-zinc-700 pt-3 mt-3">
+            <p className="text-zinc-400 text-xs mb-2">
+              {data.positions.length === 1 ? 'Position gekauft:' : `${data.positions.length} Positionen gekauft:`}
+            </p>
+            <div className="space-y-2">
+              {data.positions.map((pos: any, idx: number) => (
+                <div key={idx} className="bg-zinc-700 dark:bg-zinc-950 rounded px-2 py-1.5">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-zinc-100 font-medium text-sm">
+                      {pos.ticker}
+                    </span>
+                    <span className="text-zinc-300 text-xs">
+                      {pos.quantity} Stk.
+                    </span>
+                  </div>
+                  <div className="text-zinc-400 text-xs">
+                    Depot: {pos.bankName}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -538,16 +624,7 @@ export default function DashboardPage() {
                     tick={{ fontSize: 11 }}
                   />
                   <YAxis stroke="#9CA3AF" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1F2937',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#F9FAFB',
-                    }}
-                    formatter={(value: number) => formatCurrency(value)}
-                    labelFormatter={(label) => `Kauf: ${label}`}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend />
                   <Line
                     type="stepAfter"
