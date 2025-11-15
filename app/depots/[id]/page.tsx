@@ -42,6 +42,8 @@ export default function BankDetailPage() {
     currency: 'EUR' as 'EUR' | 'USD',
     notes: '',
   });
+  const [isLoadingPurchaseData, setIsLoadingPurchaseData] = useState(false);
+  const [isLoadingEditPurchaseData, setIsLoadingEditPurchaseData] = useState(false);
 
   // Shared stock data
   const { stockPrices, historicalData, isLoadingData, fetchStockData, hasData } = useSharedStockData();
@@ -58,6 +60,83 @@ export default function BankDetailPage() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Auto-close date picker popup after selection
+    if (name === 'purchaseDate' && value && e.target instanceof HTMLInputElement) {
+      e.target.blur();
+    }
+  };
+
+  const handleLoadPurchaseData = async () => {
+    if (!formData.ticker || !formData.purchaseDate) {
+      alert('Bitte Ticker und Kaufdatum eingeben');
+      return;
+    }
+
+    setIsLoadingPurchaseData(true);
+
+    try {
+      const response = await fetch(
+        `/api/stock/${formData.ticker}/purchase-data?date=${formData.purchaseDate}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Daten');
+      }
+
+      const data = await response.json();
+
+      // Update form with loaded data
+      setFormData((prev) => ({
+        ...prev,
+        isin: data.isin || prev.isin,
+        assetType: data.assetType || prev.assetType,
+        purchasePrice: data.purchasePrice ? data.purchasePrice.toString() : prev.purchasePrice,
+      }));
+
+      console.log('Loaded purchase data:', data);
+    } catch (error) {
+      console.error('Failed to load purchase data:', error);
+      alert('Fehler beim Laden der Kaufdaten von Yahoo Finance');
+    } finally {
+      setIsLoadingPurchaseData(false);
+    }
+  };
+
+  const handleLoadEditPurchaseData = async () => {
+    if (!editFormData.ticker || !editFormData.purchaseDate) {
+      alert('Bitte Ticker und Kaufdatum eingeben');
+      return;
+    }
+
+    setIsLoadingEditPurchaseData(true);
+
+    try {
+      const response = await fetch(
+        `/api/stock/${editFormData.ticker}/purchase-data?date=${editFormData.purchaseDate}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Daten');
+      }
+
+      const data = await response.json();
+
+      // Update form with loaded data
+      setEditFormData((prev) => ({
+        ...prev,
+        isin: data.isin || prev.isin,
+        assetType: data.assetType || prev.assetType,
+        purchasePrice: data.purchasePrice ? data.purchasePrice.toString() : prev.purchasePrice,
+      }));
+
+      console.log('Loaded purchase data:', data);
+    } catch (error) {
+      console.error('Failed to load purchase data:', error);
+      alert('Fehler beim Laden der Kaufdaten von Yahoo Finance');
+    } finally {
+      setIsLoadingEditPurchaseData(false);
+    }
   };
 
   const handleAddPosition = async (e: React.FormEvent) => {
@@ -134,6 +213,11 @@ export default function BankDetailPage() {
   ) => {
     const { name, value } = e.target;
     setEditFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Auto-close date picker popup after selection
+    if (name === 'purchaseDate' && value && e.target instanceof HTMLInputElement) {
+      e.target.blur();
+    }
   };
 
   const handleUpdatePosition = async (e: React.FormEvent) => {
@@ -406,8 +490,21 @@ export default function BankDetailPage() {
                       value={formData.purchaseDate}
                       onChange={handleInputChange}
                       required
-                      className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                      className="w-full px-4 py-3 text-base border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                      style={{ minHeight: '48px' }}
                     />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={handleLoadPurchaseData}
+                      disabled={!formData.ticker || !formData.purchaseDate || isLoadingPurchaseData}
+                      className="w-full px-4 py-2.5 bg-blue-600 dark:bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                      title="Lädt Kaufpreis, ISIN und Asset-Typ vom Yahoo Finance"
+                    >
+                      <span>{isLoadingPurchaseData ? '⏳' : '🔄'}</span>
+                      <span>{isLoadingPurchaseData ? 'Lädt...' : 'Daten von Yahoo laden'}</span>
+                    </button>
                   </div>
                   <div>
                     <label htmlFor="quantity" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
@@ -640,8 +737,21 @@ export default function BankDetailPage() {
                               value={editFormData.purchaseDate}
                               onChange={handleEditInputChange}
                               required
-                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                              className="w-full px-4 py-3 text-base border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                              style={{ minHeight: '48px' }}
                             />
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={handleLoadEditPurchaseData}
+                              disabled={!editFormData.ticker || !editFormData.purchaseDate || isLoadingEditPurchaseData}
+                              className="w-full px-4 py-2.5 bg-blue-600 dark:bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                              title="Lädt Kaufpreis, ISIN und Asset-Typ vom Yahoo Finance"
+                            >
+                              <span>{isLoadingEditPurchaseData ? '⏳' : '🔄'}</span>
+                              <span>{isLoadingEditPurchaseData ? 'Lädt...' : 'Daten von Yahoo laden'}</span>
+                            </button>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
