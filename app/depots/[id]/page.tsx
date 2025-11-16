@@ -45,6 +45,20 @@ export default function BankDetailPage() {
   const [isLoadingPurchaseData, setIsLoadingPurchaseData] = useState(false);
   const [isLoadingEditPurchaseData, setIsLoadingEditPurchaseData] = useState(false);
 
+  // ISIN Search states
+  const [isSearchingIsin, setIsSearchingIsin] = useState(false);
+  const [isSearchingEditIsin, setIsSearchingEditIsin] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{
+    symbol: string;
+    shortname: string;
+    longname: string;
+    exchDisp: string;
+    typeDisp: string;
+    quoteType: string;
+  }>>([]);
+  const [showTickerModal, setShowTickerModal] = useState(false);
+  const [isEditFormSearch, setIsEditFormSearch] = useState(false);
+
   // Shared stock data
   const { stockPrices, historicalData, isLoadingData, fetchStockData, hasData } = useSharedStockData();
 
@@ -137,6 +151,80 @@ export default function BankDetailPage() {
     } finally {
       setIsLoadingEditPurchaseData(false);
     }
+  };
+
+  const handleSearchIsin = async () => {
+    if (!formData.isin) {
+      alert('Bitte ISIN eingeben');
+      return;
+    }
+
+    setIsSearchingIsin(true);
+    setIsEditFormSearch(false);
+
+    try {
+      const response = await fetch(`/api/stock/search?query=${formData.isin}`);
+
+      if (!response.ok) {
+        throw new Error('Fehler bei der Suche');
+      }
+
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        setSearchResults(data.results);
+        setShowTickerModal(true);
+      } else {
+        alert(`Keine Ticker für ISIN ${formData.isin} gefunden. Bitte Ticker manuell eingeben.`);
+      }
+    } catch (error) {
+      console.error('Failed to search ISIN:', error);
+      alert('Fehler bei der ISIN-Suche');
+    } finally {
+      setIsSearchingIsin(false);
+    }
+  };
+
+  const handleSearchEditIsin = async () => {
+    if (!editFormData.isin) {
+      alert('Bitte ISIN eingeben');
+      return;
+    }
+
+    setIsSearchingEditIsin(true);
+    setIsEditFormSearch(true);
+
+    try {
+      const response = await fetch(`/api/stock/search?query=${editFormData.isin}`);
+
+      if (!response.ok) {
+        throw new Error('Fehler bei der Suche');
+      }
+
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        setSearchResults(data.results);
+        setShowTickerModal(true);
+      } else {
+        alert(`Keine Ticker für ISIN ${editFormData.isin} gefunden. Bitte Ticker manuell eingeben.`);
+      }
+    } catch (error) {
+      console.error('Failed to search ISIN:', error);
+      alert('Fehler bei der ISIN-Suche');
+    } finally {
+      setIsSearchingEditIsin(false);
+    }
+  };
+
+  const handleSelectTicker = (symbol: string) => {
+    if (isEditFormSearch) {
+      setEditFormData((prev) => ({ ...prev, ticker: symbol }));
+    } else {
+      setFormData((prev) => ({ ...prev, ticker: symbol }));
+    }
+    setShowTickerModal(false);
+    setSearchResults([]);
   };
 
   const handleAddPosition = async (e: React.FormEvent) => {
@@ -442,16 +530,27 @@ export default function BankDetailPage() {
                     <label htmlFor="isin" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       ISIN *
                     </label>
-                    <input
-                      type="text"
-                      id="isin"
-                      name="isin"
-                      value={formData.isin}
-                      onChange={handleInputChange}
-                      placeholder="z.B. US5949181045"
-                      required
-                      className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        id="isin"
+                        name="isin"
+                        value={formData.isin}
+                        onChange={handleInputChange}
+                        placeholder="z.B. US5949181045"
+                        required
+                        className="flex-1 px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSearchIsin}
+                        disabled={!formData.isin || isSearchingIsin}
+                        className="px-3 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg font-medium hover:bg-green-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Ticker für ISIN suchen"
+                      >
+                        {isSearchingIsin ? '⏳' : '🔍'}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label htmlFor="ticker" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
@@ -694,14 +793,25 @@ export default function BankDetailPage() {
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                               ISIN *
                             </label>
-                            <input
-                              type="text"
-                              name="isin"
-                              value={editFormData.isin}
-                              onChange={handleEditInputChange}
-                              required
-                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
-                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                name="isin"
+                                value={editFormData.isin}
+                                onChange={handleEditInputChange}
+                                required
+                                className="flex-1 px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleSearchEditIsin}
+                                disabled={!editFormData.isin || isSearchingEditIsin}
+                                className="px-3 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg font-medium hover:bg-green-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Ticker für ISIN suchen"
+                              >
+                                {isSearchingEditIsin ? '⏳' : '🔍'}
+                              </button>
+                            </div>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
@@ -979,6 +1089,68 @@ export default function BankDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Ticker Selection Modal */}
+      {showTickerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-700">
+              <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+                Ticker auswählen
+              </h3>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                {searchResults.length} Ergebnis{searchResults.length !== 1 ? 'se' : ''} gefunden
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
+                {searchResults.map((result, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSelectTicker(result.symbol)}
+                    className="w-full text-left p-4 border border-zinc-300 dark:border-zinc-600 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                            {result.symbol}
+                          </span>
+                          {result.typeDisp && (
+                            <span className="px-2 py-0.5 text-xs font-medium bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded">
+                              {result.typeDisp}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                          {result.longname || result.shortname}
+                        </p>
+                        {result.exchDisp && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                            {result.exchDisp}
+                          </p>
+                        )}
+                      </div>
+                      <span className="text-zinc-400 dark:text-zinc-500">→</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-6 border-t border-zinc-200 dark:border-zinc-700">
+              <button
+                onClick={() => {
+                  setShowTickerModal(false);
+                  setSearchResults([]);
+                }}
+                className="w-full px-6 py-2.5 bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-50 rounded-lg font-medium hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
