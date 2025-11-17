@@ -91,52 +91,80 @@ export default function DashboardPage() {
         const ticker = asset.ticker;
         asset.averagePurchasePrice = asset.totalPurchaseValue / asset.totalQuantity;
 
-        const stockPrice = stockPrices[ticker];
-        const historical = historicalData[ticker];
+        // Check if any position is a bond
+        const isBond = asset.positions.some(p => p.assetType === 'bond');
 
-        if (stockPrice) {
-          asset.name = stockPrice.name;
-          asset.currentPrice = stockPrice.currentPrice;
-          asset.totalCurrentValue = asset.totalQuantity * stockPrice.currentPrice;
+        if (isBond) {
+          // For bonds: use nominal value and coupon instead of Yahoo Finance
+          const bondPosition = asset.positions.find(p => p.assetType === 'bond' && p.nominalValue && p.couponRate);
 
-          // Daily gain/loss
-          if (historical?.previousClose) {
-            asset.dailyGain =
-              asset.totalQuantity * (stockPrice.currentPrice - historical.previousClose);
-            asset.dailyGainPercent =
-              ((stockPrice.currentPrice - historical.previousClose) / historical.previousClose) * 100;
-          }
+          if (bondPosition && bondPosition.nominalValue && bondPosition.couponRate !== undefined) {
+            asset.name = bondPosition.ticker;
+            asset.currentPrice = bondPosition.nominalValue;
+            asset.totalCurrentValue = bondPosition.nominalValue;
 
-          // Yearly gain/loss - using separate method
-          const yearlyPerf = calculateYearlyPerformance(
-            ticker,
-            stockPrice.currentPrice,
-            asset.totalQuantity
-          );
-          asset.yearlyGain = yearlyPerf.yearlyGain;
-          asset.yearlyGainPercent = yearlyPerf.yearlyGainPercent;
+            // For bonds, coupon is the "dividend"
+            const annualCoupon = (bondPosition.nominalValue * bondPosition.couponRate) / 100;
+            asset.currentYearDividends = annualCoupon;
+            asset.expectedDividends = annualCoupon;
 
-          // Dividends - simplified using stockPrices directly
-          if (stockPrice.trailingDividendRate) {
-            asset.currentYearDividends = stockPrice.trailingDividendRate * asset.totalQuantity;
-            console.log(`[Dashboard] ${ticker} current dividends (trailing):`, {
-              trailingDividendRate: stockPrice.trailingDividendRate,
-              totalQuantity: asset.totalQuantity,
-              totalCurrentYearDiv: asset.currentYearDividends,
+            console.log(`[Dashboard] ${ticker} bond coupon:`, {
+              nominalValue: bondPosition.nominalValue,
+              couponRate: bondPosition.couponRate,
+              annualCoupon,
             });
-          }
-
-          if (stockPrice.dividendRate) {
-            asset.expectedDividends = stockPrice.dividendRate * asset.totalQuantity;
-            console.log(`[Dashboard] ${ticker} expected dividends (forward):`, {
-              dividendRate: stockPrice.dividendRate,
-              totalQuantity: asset.totalQuantity,
-              totalExpectedDiv: asset.expectedDividends,
-            });
+          } else {
+            asset.totalCurrentValue = asset.totalPurchaseValue;
           }
         } else {
-          asset.totalCurrentValue = asset.totalPurchaseValue;
-          console.log(`[Dashboard] ${ticker}: No stock price data available`);
+          // For stocks/ETFs: use Yahoo Finance data
+          const stockPrice = stockPrices[ticker];
+          const historical = historicalData[ticker];
+
+          if (stockPrice) {
+            asset.name = stockPrice.name;
+            asset.currentPrice = stockPrice.currentPrice;
+            asset.totalCurrentValue = asset.totalQuantity * stockPrice.currentPrice;
+
+            // Daily gain/loss
+            if (historical?.previousClose) {
+              asset.dailyGain =
+                asset.totalQuantity * (stockPrice.currentPrice - historical.previousClose);
+              asset.dailyGainPercent =
+                ((stockPrice.currentPrice - historical.previousClose) / historical.previousClose) * 100;
+            }
+
+            // Yearly gain/loss - using separate method
+            const yearlyPerf = calculateYearlyPerformance(
+              ticker,
+              stockPrice.currentPrice,
+              asset.totalQuantity
+            );
+            asset.yearlyGain = yearlyPerf.yearlyGain;
+            asset.yearlyGainPercent = yearlyPerf.yearlyGainPercent;
+
+            // Dividends - simplified using stockPrices directly
+            if (stockPrice.trailingDividendRate) {
+              asset.currentYearDividends = stockPrice.trailingDividendRate * asset.totalQuantity;
+              console.log(`[Dashboard] ${ticker} current dividends (trailing):`, {
+                trailingDividendRate: stockPrice.trailingDividendRate,
+                totalQuantity: asset.totalQuantity,
+                totalCurrentYearDiv: asset.currentYearDividends,
+              });
+            }
+
+            if (stockPrice.dividendRate) {
+              asset.expectedDividends = stockPrice.dividendRate * asset.totalQuantity;
+              console.log(`[Dashboard] ${ticker} expected dividends (forward):`, {
+                dividendRate: stockPrice.dividendRate,
+                totalQuantity: asset.totalQuantity,
+                totalExpectedDiv: asset.expectedDividends,
+              });
+            }
+          } else {
+            asset.totalCurrentValue = asset.totalPurchaseValue;
+            console.log(`[Dashboard] ${ticker}: No stock price data available`);
+          }
         }
 
         return asset;

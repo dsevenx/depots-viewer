@@ -20,7 +20,9 @@ const POSITION_CSV_HEADERS = [
   'quantity',
   'purchasePrice',
   'currency',
-  'notes'
+  'notes',
+  'nominalValue',
+  'couponRate'
 ];
 
 /**
@@ -36,7 +38,9 @@ export function downloadExamplePositionCSV() {
       quantity: '10',
       purchasePrice: '185.50',
       currency: 'USD',
-      notes: 'Tech-Aktie'
+      notes: 'Tech-Aktie',
+      nominalValue: '',
+      couponRate: ''
     },
     {
       isin: 'IE00B4L5Y983',
@@ -46,7 +50,21 @@ export function downloadExamplePositionCSV() {
       quantity: '50',
       purchasePrice: '78.25',
       currency: 'EUR',
-      notes: 'MSCI World ETF'
+      notes: 'MSCI World ETF',
+      nominalValue: '',
+      couponRate: ''
+    },
+    {
+      isin: 'DE0001135085',
+      ticker: 'DBR',
+      assetType: 'bond',
+      purchaseDate: '2024-03-01',
+      quantity: '1',
+      purchasePrice: '10000',
+      currency: 'EUR',
+      notes: 'Bundesanleihe',
+      nominalValue: '10000',
+      couponRate: '4'
     }
   ];
 
@@ -73,7 +91,9 @@ export function exportPositionsToCSV(positions: Position[], bankName: string) {
     quantity: pos.quantity,
     purchasePrice: pos.purchasePrice,
     currency: pos.currency,
-    notes: pos.notes || ''
+    notes: pos.notes || '',
+    nominalValue: pos.nominalValue || '',
+    couponRate: pos.couponRate || ''
   }));
 
   const csv = arrayToCSV(positionsForExport, POSITION_CSV_HEADERS);
@@ -142,6 +162,45 @@ function parsePositionRow(
     throw new Error('Kaufdatum hat ungültiges Format (erwartetes Format: YYYY-MM-DD)');
   }
 
+  // Parse bond-specific fields
+  let nominalValue: number | undefined;
+  let couponRate: number | undefined;
+
+  if (assetType === 'bond') {
+    // For bonds, nominalValue and couponRate are required
+    if (row.nominalValue?.trim()) {
+      nominalValue = parseFloat(row.nominalValue.trim());
+      if (isNaN(nominalValue) || nominalValue <= 0) {
+        throw new Error('Nominalwert muss eine positive Zahl sein');
+      }
+    } else {
+      throw new Error('Nominalwert ist für Anleihen ein Pflichtfeld');
+    }
+
+    if (row.couponRate?.trim()) {
+      couponRate = parseFloat(row.couponRate.trim());
+      if (isNaN(couponRate) || couponRate < 0) {
+        throw new Error('Kupon muss eine nicht-negative Zahl sein');
+      }
+    } else {
+      throw new Error('Kupon ist für Anleihen ein Pflichtfeld');
+    }
+  } else {
+    // For stocks/ETFs, these fields are optional
+    if (row.nominalValue?.trim()) {
+      nominalValue = parseFloat(row.nominalValue.trim());
+      if (isNaN(nominalValue)) {
+        nominalValue = undefined;
+      }
+    }
+    if (row.couponRate?.trim()) {
+      couponRate = parseFloat(row.couponRate.trim());
+      if (isNaN(couponRate)) {
+        couponRate = undefined;
+      }
+    }
+  }
+
   return {
     bankId,
     isin: row.isin.trim().toUpperCase(),
@@ -152,6 +211,8 @@ function parsePositionRow(
     purchasePrice,
     currency: currency as 'EUR' | 'USD',
     notes: row.notes?.trim() || undefined,
+    nominalValue,
+    couponRate,
     createdAt: new Date()
   };
 }
@@ -194,6 +255,8 @@ export function parsePositionCSV(
         purchasePrice: parseFloat(row.purchasePrice) || 0,
         currency: (row.currency?.trim().toUpperCase() as any) || 'EUR',
         notes: row.notes?.trim(),
+        nominalValue: row.nominalValue ? parseFloat(row.nominalValue) : undefined,
+        couponRate: row.couponRate ? parseFloat(row.couponRate) : undefined,
         createdAt: new Date(),
         _rowNumber: rowNumber,
         _error: errorMessage

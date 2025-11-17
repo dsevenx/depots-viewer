@@ -30,6 +30,8 @@ export default function BankDetailPage() {
     purchasePrice: '',
     currency: 'EUR' as 'EUR' | 'USD',
     notes: '',
+    nominalValue: '', // Für Anleihen
+    couponRate: '', // Für Anleihen (in %)
   });
   const [wkn, setWkn] = useState(''); // WKN helper field for search
   const [editingPositionId, setEditingPositionId] = useState<number | null>(null);
@@ -42,6 +44,8 @@ export default function BankDetailPage() {
     purchasePrice: '',
     currency: 'EUR' as 'EUR' | 'USD',
     notes: '',
+    nominalValue: '', // Für Anleihen
+    couponRate: '', // Für Anleihen (in %)
   });
   const [editWkn, setEditWkn] = useState(''); // WKN helper field for search
   const [isLoadingPurchaseData, setIsLoadingPurchaseData] = useState(false);
@@ -238,6 +242,14 @@ export default function BankDetailPage() {
       return;
     }
 
+    // Validate bond-specific fields
+    if (formData.assetType === 'bond') {
+      if (!formData.nominalValue || !formData.couponRate) {
+        alert('Bitte Nominalwert und Kupon für Anleihe eingeben');
+        return;
+      }
+    }
+
     try {
       await db.positions.add({
         bankId,
@@ -249,6 +261,8 @@ export default function BankDetailPage() {
         purchasePrice: parseFloat(formData.purchasePrice),
         currency: formData.currency,
         notes: formData.notes.trim() || undefined,
+        nominalValue: formData.nominalValue ? parseFloat(formData.nominalValue) : undefined,
+        couponRate: formData.couponRate ? parseFloat(formData.couponRate) : undefined,
         createdAt: new Date(),
       });
 
@@ -262,6 +276,8 @@ export default function BankDetailPage() {
         purchasePrice: '',
         currency: 'EUR',
         notes: '',
+        nominalValue: '',
+        couponRate: '',
       });
       setWkn('');
       setIsAddingPosition(false);
@@ -297,6 +313,8 @@ export default function BankDetailPage() {
       purchasePrice: position.purchasePrice.toString(),
       currency: position.currency,
       notes: position.notes || '',
+      nominalValue: position.nominalValue ? position.nominalValue.toString() : '',
+      couponRate: position.couponRate ? position.couponRate.toString() : '',
     });
   };
 
@@ -316,6 +334,14 @@ export default function BankDetailPage() {
       return;
     }
 
+    // Validate bond-specific fields
+    if (editFormData.assetType === 'bond') {
+      if (!editFormData.nominalValue || !editFormData.couponRate) {
+        alert('Bitte Nominalwert und Kupon für Anleihe eingeben');
+        return;
+      }
+    }
+
     try {
       await db.positions.update(editingPositionId, {
         isin: editFormData.isin.trim().toUpperCase(),
@@ -326,6 +352,8 @@ export default function BankDetailPage() {
         purchasePrice: parseFloat(editFormData.purchasePrice),
         currency: editFormData.currency,
         notes: editFormData.notes.trim() || undefined,
+        nominalValue: editFormData.nominalValue ? parseFloat(editFormData.nominalValue) : undefined,
+        couponRate: editFormData.couponRate ? parseFloat(editFormData.couponRate) : undefined,
       });
 
       // Reset edit state
@@ -339,6 +367,8 @@ export default function BankDetailPage() {
         purchasePrice: '',
         currency: 'EUR',
         notes: '',
+        nominalValue: '',
+        couponRate: '',
       });
     } catch (error) {
       console.error('Failed to update position:', error);
@@ -357,6 +387,8 @@ export default function BankDetailPage() {
       purchasePrice: '',
       currency: 'EUR',
       notes: '',
+      nominalValue: '',
+      couponRate: '',
     });
     setEditWkn('');
   };
@@ -663,6 +695,45 @@ export default function BankDetailPage() {
                     ]}
                     required
                   />
+                  {/* Bond-specific fields */}
+                  {formData.assetType === 'bond' && (
+                    <>
+                      <div>
+                        <label htmlFor="nominalValue" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                          Nominalwert * (für Anleihen)
+                        </label>
+                        <input
+                          type="number"
+                          id="nominalValue"
+                          name="nominalValue"
+                          value={formData.nominalValue}
+                          onChange={handleInputChange}
+                          placeholder="z.B. 10000"
+                          step="0.01"
+                          min="0"
+                          required={formData.assetType === 'bond'}
+                          className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="couponRate" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                          Kupon in % * (für Anleihen)
+                        </label>
+                        <input
+                          type="number"
+                          id="couponRate"
+                          name="couponRate"
+                          value={formData.couponRate}
+                          onChange={handleInputChange}
+                          placeholder="z.B. 4"
+                          step="0.01"
+                          min="0"
+                          required={formData.assetType === 'bond'}
+                          className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                        />
+                      </div>
+                    </>
+                  )}
                   <div className="sm:col-span-2">
                     <label htmlFor="notes" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       Notizen (optional)
@@ -787,10 +858,24 @@ export default function BankDetailPage() {
               positions.map((position) => {
                 const totalValue = position.quantity * position.purchasePrice;
                 const isEditing = editingPositionId === position.id;
-                const stockPrice = stockPrices[position.ticker];
-                const currentValue = stockPrice ? position.quantity * stockPrice.currentPrice : null;
-                const gain = currentValue ? currentValue - totalValue : null;
-                const gainPercent = gain && totalValue ? (gain / totalValue) * 100 : null;
+
+                // For bonds, use nominal value instead of Yahoo Finance data
+                let stockPrice = stockPrices[position.ticker];
+                let currentValue: number | null = null;
+                let gain: number | null = null;
+                let gainPercent: number | null = null;
+
+                if (position.assetType === 'bond' && position.nominalValue) {
+                  // For bonds: current value = nominal value (no market price changes)
+                  currentValue = position.nominalValue;
+                  gain = currentValue - totalValue;
+                  gainPercent = totalValue ? (gain / totalValue) * 100 : null;
+                } else {
+                  // For stocks/ETFs: use Yahoo Finance data
+                  currentValue = stockPrice ? position.quantity * stockPrice.currentPrice : null;
+                  gain = currentValue ? currentValue - totalValue : null;
+                  gainPercent = gain && totalValue ? (gain / totalValue) * 100 : null;
+                }
 
                 return (
                   <div
@@ -933,6 +1018,43 @@ export default function BankDetailPage() {
                             ]}
                             required
                           />
+                          {/* Bond-specific fields */}
+                          {editFormData.assetType === 'bond' && (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                                  Nominalwert * (für Anleihen)
+                                </label>
+                                <input
+                                  type="number"
+                                  name="nominalValue"
+                                  value={editFormData.nominalValue}
+                                  onChange={handleEditInputChange}
+                                  placeholder="z.B. 10000"
+                                  step="0.01"
+                                  min="0"
+                                  required={editFormData.assetType === 'bond'}
+                                  className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                                  Kupon in % * (für Anleihen)
+                                </label>
+                                <input
+                                  type="number"
+                                  name="couponRate"
+                                  value={editFormData.couponRate}
+                                  onChange={handleEditInputChange}
+                                  placeholder="z.B. 4"
+                                  step="0.01"
+                                  min="0"
+                                  required={editFormData.assetType === 'bond'}
+                                  className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                                />
+                              </div>
+                            </>
+                          )}
                           <div className="sm:col-span-2">
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                               Notizen (optional)
@@ -1013,8 +1135,33 @@ export default function BankDetailPage() {
                                   </p>
                                 </div>
                               </div>
-                              {/* Dividends Section */}
-                              {(stockPrice.trailingDividendRate || stockPrice.dividendRate) && (
+                              {/* Dividends/Coupon Section */}
+                              {(position.assetType === 'bond' && position.nominalValue && position.couponRate) ? (
+                                // Bond coupon
+                                <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                    <div>
+                                      <p className="text-zinc-500 dark:text-zinc-500">Kupon</p>
+                                      <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                        {position.couponRate}%
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-zinc-500 dark:text-zinc-500">Kupon p.a.</p>
+                                      <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                        {formatCurrency((position.nominalValue * position.couponRate) / 100, position.currency)}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-zinc-500 dark:text-zinc-500">Nominalwert</p>
+                                      <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                        {formatCurrency(position.nominalValue, position.currency)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (stockPrice?.trailingDividendRate || stockPrice?.dividendRate) && (
+                                // Stock/ETF dividends
                                 <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700">
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                                     {/* Trailing (Current) Dividend */}
