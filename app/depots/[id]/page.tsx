@@ -76,11 +76,6 @@ export default function BankDetailPage() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Auto-close date picker popup after selection
-    if (name === 'purchaseDate' && value && e.target instanceof HTMLInputElement) {
-      e.target.blur();
-    }
   };
 
   const handleLoadPurchaseData = async () => {
@@ -310,11 +305,6 @@ export default function BankDetailPage() {
   ) => {
     const { name, value } = e.target;
     setEditFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Auto-close date picker popup after selection
-    if (name === 'purchaseDate' && value && e.target instanceof HTMLInputElement) {
-      e.target.blur();
-    }
   };
 
   const handleUpdatePosition = async (e: React.FormEvent) => {
