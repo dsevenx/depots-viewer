@@ -31,6 +31,7 @@ export default function BankDetailPage() {
     currency: 'EUR' as 'EUR' | 'USD',
     notes: '',
   });
+  const [wkn, setWkn] = useState(''); // WKN helper field for search
   const [editingPositionId, setEditingPositionId] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState({
     isin: '',
@@ -42,6 +43,7 @@ export default function BankDetailPage() {
     currency: 'EUR' as 'EUR' | 'USD',
     notes: '',
   });
+  const [editWkn, setEditWkn] = useState(''); // WKN helper field for search
   const [isLoadingPurchaseData, setIsLoadingPurchaseData] = useState(false);
   const [isLoadingEditPurchaseData, setIsLoadingEditPurchaseData] = useState(false);
 
@@ -154,8 +156,11 @@ export default function BankDetailPage() {
   };
 
   const handleSearchIsin = async () => {
-    if (!formData.isin) {
-      alert('Bitte ISIN eingeben');
+    // Use WKN if provided, otherwise use ISIN
+    const searchQuery = wkn.trim() || formData.isin.trim();
+
+    if (!searchQuery) {
+      alert('Bitte ISIN oder WKN eingeben');
       return;
     }
 
@@ -163,7 +168,7 @@ export default function BankDetailPage() {
     setIsEditFormSearch(false);
 
     try {
-      const response = await fetch(`/api/stock/search?query=${formData.isin}`);
+      const response = await fetch(`/api/stock/search?query=${searchQuery}`);
 
       if (!response.ok) {
         throw new Error('Fehler bei der Suche');
@@ -175,19 +180,22 @@ export default function BankDetailPage() {
         setSearchResults(data.results);
         setShowTickerModal(true);
       } else {
-        alert(`Keine Ticker für ISIN ${formData.isin} gefunden. Bitte Ticker manuell eingeben.`);
+        alert(`Keine Ticker für "${searchQuery}" gefunden. Bitte Ticker manuell eingeben oder WKN versuchen.`);
       }
     } catch (error) {
-      console.error('Failed to search ISIN:', error);
-      alert('Fehler bei der ISIN-Suche');
+      console.error('Failed to search ISIN/WKN:', error);
+      alert('Fehler bei der Suche');
     } finally {
       setIsSearchingIsin(false);
     }
   };
 
   const handleSearchEditIsin = async () => {
-    if (!editFormData.isin) {
-      alert('Bitte ISIN eingeben');
+    // Use WKN if provided, otherwise use ISIN
+    const searchQuery = editWkn.trim() || editFormData.isin.trim();
+
+    if (!searchQuery) {
+      alert('Bitte ISIN oder WKN eingeben');
       return;
     }
 
@@ -195,7 +203,7 @@ export default function BankDetailPage() {
     setIsEditFormSearch(true);
 
     try {
-      const response = await fetch(`/api/stock/search?query=${editFormData.isin}`);
+      const response = await fetch(`/api/stock/search?query=${searchQuery}`);
 
       if (!response.ok) {
         throw new Error('Fehler bei der Suche');
@@ -207,11 +215,11 @@ export default function BankDetailPage() {
         setSearchResults(data.results);
         setShowTickerModal(true);
       } else {
-        alert(`Keine Ticker für ISIN ${editFormData.isin} gefunden. Bitte Ticker manuell eingeben.`);
+        alert(`Keine Ticker für "${searchQuery}" gefunden. Bitte Ticker manuell eingeben oder WKN versuchen.`);
       }
     } catch (error) {
-      console.error('Failed to search ISIN:', error);
-      alert('Fehler bei der ISIN-Suche');
+      console.error('Failed to search ISIN/WKN:', error);
+      alert('Fehler bei der Suche');
     } finally {
       setIsSearchingEditIsin(false);
     }
@@ -260,6 +268,7 @@ export default function BankDetailPage() {
         currency: 'EUR',
         notes: '',
       });
+      setWkn('');
       setIsAddingPosition(false);
     } catch (error) {
       console.error('Failed to add position:', error);
@@ -359,6 +368,7 @@ export default function BankDetailPage() {
       currency: 'EUR',
       notes: '',
     });
+    setEditWkn('');
   };
 
   const formatCurrency = (amount: number, currency: string) => {
@@ -530,23 +540,37 @@ export default function BankDetailPage() {
                     <label htmlFor="isin" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                       ISIN *
                     </label>
+                    <input
+                      type="text"
+                      id="isin"
+                      name="isin"
+                      value={formData.isin}
+                      onChange={handleInputChange}
+                      placeholder="z.B. US5949181045 oder DE0001135085"
+                      required
+                      className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="wkn" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                      WKN (optional, für deutsche Wertpapiere)
+                    </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        id="isin"
-                        name="isin"
-                        value={formData.isin}
-                        onChange={handleInputChange}
-                        placeholder="z.B. US5949181045"
-                        required
+                        id="wkn"
+                        name="wkn"
+                        value={wkn}
+                        onChange={(e) => setWkn(e.target.value)}
+                        placeholder="z.B. 113508"
                         className="flex-1 px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                       />
                       <button
                         type="button"
                         onClick={handleSearchIsin}
-                        disabled={!formData.isin || isSearchingIsin}
+                        disabled={(!formData.isin && !wkn) || isSearchingIsin}
                         className="px-3 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg font-medium hover:bg-green-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Ticker für ISIN suchen"
+                        title="Ticker für ISIN/WKN suchen"
                       >
                         {isSearchingIsin ? '⏳' : '🔍'}
                       </button>
@@ -685,6 +709,7 @@ export default function BankDetailPage() {
                         currency: 'EUR',
                         notes: '',
                       });
+                      setWkn('');
                     }}
                     className="px-6 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 border border-zinc-300 dark:border-zinc-700 rounded-lg font-medium hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
                   >
@@ -793,21 +818,35 @@ export default function BankDetailPage() {
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                               ISIN *
                             </label>
+                            <input
+                              type="text"
+                              name="isin"
+                              value={editFormData.isin}
+                              onChange={handleEditInputChange}
+                              required
+                              placeholder="z.B. US5949181045 oder DE0001135085"
+                              className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                              WKN (optional, für deutsche Wertpapiere)
+                            </label>
                             <div className="flex gap-2">
                               <input
                                 type="text"
-                                name="isin"
-                                value={editFormData.isin}
-                                onChange={handleEditInputChange}
-                                required
+                                name="editWkn"
+                                value={editWkn}
+                                onChange={(e) => setEditWkn(e.target.value)}
+                                placeholder="z.B. 113508"
                                 className="flex-1 px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                               />
                               <button
                                 type="button"
                                 onClick={handleSearchEditIsin}
-                                disabled={!editFormData.isin || isSearchingEditIsin}
+                                disabled={(!editFormData.isin && !editWkn) || isSearchingEditIsin}
                                 className="px-3 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg font-medium hover:bg-green-700 dark:hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Ticker für ISIN suchen"
+                                title="Ticker für ISIN/WKN suchen"
                               >
                                 {isSearchingEditIsin ? '⏳' : '🔍'}
                               </button>
@@ -823,6 +862,7 @@ export default function BankDetailPage() {
                               value={editFormData.ticker}
                               onChange={handleEditInputChange}
                               required
+                              placeholder="z.B. MSFT"
                               className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg focus:ring-2 focus:ring-zinc-500 dark:bg-zinc-900 dark:text-zinc-50"
                             />
                           </div>
